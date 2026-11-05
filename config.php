@@ -1,0 +1,28 @@
+<?php
+$envFile=__DIR__.'/.env';
+if (is_file($envFile)) {
+    foreach (file($envFile, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES) as $line) {
+        $line=trim($line);
+        if ($line==='' || str_starts_with($line,'#') || !str_contains($line,'=')) continue;
+        [$key,$value]=explode('=',$line,2); $key=trim($key); $value=trim($value);
+        if (!preg_match('/^[A-Z_][A-Z0-9_]*$/',$key) || getenv($key)!==false) continue;
+        if (strlen($value)>=2 && (($value[0]==='"' && str_ends_with($value,'"')) || ($value[0]==="'" && str_ends_with($value,"'")))) $value=substr($value,1,-1);
+        putenv($key.'='.$value);
+    }
+}
+return [
+    'bale_token' => getenv('BALE_TOKEN') ?: '',
+    'admin_ids' => array_filter(array_map('trim', explode(',', getenv('ADMIN_IDS') ?: ''))),
+    'bot_username' => ltrim(getenv('BOT_USERNAME') ?: '', '@'),
+    'db' => getenv('DB_PATH') ?: __DIR__ . '/data/ahmad.sqlite',
+    'timezone' => getenv('TIMEZONE') ?: 'Asia/Tehran',
+    'ai_url' => rtrim(getenv('AI_BASE_URL') ?: '', '/'),
+    'ai_key' => getenv('AI_API_KEY') ?: '',
+    'ai_model' => getenv('AI_MODEL') ?: '',
+    'image_model' => getenv('IMAGE_MODEL') ?: '',
+    'image_provider' => strtolower(getenv('IMAGE_PROVIDER') ?: 'openai'),
+    'image_url' => rtrim(getenv('IMAGE_BASE_URL') ?: (getenv('IMAGE_PROVIDER') === 'cloudflare' ? '' : (getenv('AI_BASE_URL') ?: '')), '/'),
+    'image_key' => getenv('IMAGE_API_KEY') ?: (getenv('IMAGE_PROVIDER') === 'cloudflare' ? '' : (getenv('AI_API_KEY') ?: '')),
+    'cloudflare_account' => getenv('CLOUDFLARE_ACCOUNT_ID') ?: '',
+    'webhook_secret' => getenv('WEBHOOK_SECRET') ?: '',
+];
