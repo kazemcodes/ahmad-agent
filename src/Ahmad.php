@@ -4,14 +4,16 @@ require_once __DIR__.'/Memory.php';
 require_once __DIR__.'/ImageSender.php';
 require_once __DIR__.'/ImageProvider.php';
 require_once __DIR__.'/ConversationPrompt.php';
+require_once __DIR__.'/RequestQueue.php';
 final class Ahmad {
-    private PDO $db; private array $c; private Memory $memory;
+    private PDO $db; private array $c; private Memory $memory; private RequestQueue $queue;
     public function __construct(array $c) {
         $this->c=$c; date_default_timezone_set($c['timezone']);
         if (!is_dir(dirname($c['db']))) mkdir(dirname($c['db']), 0700, true);
         $this->db=new PDO('sqlite:'.$c['db'], null, null, [PDO::ATTR_ERRMODE=>PDO::ERRMODE_EXCEPTION]);
         $this->db->exec('PRAGMA busy_timeout=5000; PRAGMA journal_mode=WAL; CREATE TABLE IF NOT EXISTS updates(id INTEGER PRIMARY KEY); CREATE TABLE IF NOT EXISTS classes(chat INTEGER PRIMARY KEY, start TEXT, end TEXT); CREATE TABLE IF NOT EXISTS roster(id INTEGER PRIMARY KEY, chat INTEGER, name TEXT, user_id INTEGER, UNIQUE(chat,name)); CREATE TABLE IF NOT EXISTS messages(id INTEGER PRIMARY KEY, chat INTEGER, user_id INTEGER, name TEXT, text TEXT, at INTEGER); CREATE TABLE IF NOT EXISTS attendance(chat INTEGER, day TEXT, student INTEGER, at INTEGER, PRIMARY KEY(chat,day,student)); CREATE TABLE IF NOT EXISTS session_attendance(chat INTEGER NOT NULL, day TEXT NOT NULL, schedule_id INTEGER NOT NULL, student INTEGER NOT NULL, at INTEGER NOT NULL, PRIMARY KEY(chat,day,schedule_id,student)); CREATE TABLE IF NOT EXISTS schedules(id INTEGER PRIMARY KEY, chat INTEGER NOT NULL, weekday INTEGER NOT NULL, start TEXT NOT NULL, end TEXT NOT NULL, UNIQUE(chat,weekday,start,end)); CREATE TABLE IF NOT EXISTS corrections(id INTEGER PRIMARY KEY, chat INTEGER, user_id INTEGER, requested TEXT, status TEXT DEFAULT \'pending\');');
         $this->memory = new Memory($this->db);
+        $this->queue = new RequestQueue($c['db']);
     }
     private function log(string $event,array $context=[]): void { error_log('[ahmad] '.date(DATE_ATOM).' '.$event.' '.json_encode($context,JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES)); }
     private function query(string $sql,array $args=[]): PDOStatement { $s=$this->db->prepare($sql); $s->execute($args); return $s; }
@@ -44,8 +46,9 @@ final class Ahmad {
         if (!isset($u['update_id'])) { $this->log('update.missing_id'); return; } $this->log('update.received',['update_id'=>$u['update_id'],'kind'=>isset($u['message'])?'message':'other']);
         $s=$this->query('INSERT OR IGNORE INTO updates(id) VALUES(?)',[$u['update_id']]); if (!$s->rowCount()) { $this->log('update.duplicate',['update_id'=>$u['update_id']]); return; }
         $m=$u['message']??null; if (!$m || !isset($m['from']['id'],$m['chat']['id'])) return;
-        $chat=(int)$m['chat']['id']; $user=(int)$m['from']['id']; $text=trim($m['text']??''); $mid=$m['message_id']??null; $at=(int)($m['date']??time());
+        $chat=(int)$m['chat']['id']; $user=(int)$m['from']['id']; $text=trim($m['text']??$m['caption']??''); $mid=$m['message_id']??null; $at=(int)($m['date']??time());
         $name=trim(($m['from']['first_name']??'').' '.($m['from']['last_name']??'')); $this->log('message.received',['chat_id'=>$chat,'user_id'=>$user,'message_id'=>$mid,'text_length'=>mb_strlen($text),'chat_type'=>$m['chat']['type']??'unknown']);
+        $this->memory->observeUser($chat,$m['from'],$at);
         $this->query('INSERT INTO messages(chat,user_id,name,text,at) VALUES(?,?,?,?,?)',[$chat,$user,$name,$text,$at]);
         if ($text==='/start' || $text==='/help') { $this->send($chat,"سلام، من استاد احمد هستم. دانش‌آموزان در زمان کلاس نام خود را بفرستند.\nدستورات معلم: /class HH:MM HH:MM ، /roster نام‌ها (هر نام در یک خط)، /report ، /rename نام قدیم | نام جدید.\nبرای پرسش مرا با «استاد احمد» صدا بزنید یا به پیام من پاسخ دهید.",$mid); return; }
         if (preg_match('~^/(class|schedule|schedules|unschedule|roster|report|sessions|rename|requests|approve)(?:@\w+)?(?:\s+([\s\S]*))?$~u',$text,$a)) {
@@ -87,6 +90,7 @@ final class Ahmad {
             $imagePrompt = $text;
         }
         if ($imagePrompt !== null) {
+            if (!$this->queue->allow('image',$user,$this->c['image_limit'],3600)) { $this->send($chat,'درخواست تصویر زیاد شده؛ لطفاً کمی بعد دوباره تلاش کن.',$mid); return; }
             if (!$this->c['image_key'] || !$this->c['image_model']) { $this->send($chat,'سرویس تولید تصویر تنظیم نشده است.',$mid); return; }
             try {
                 $this->log('image.requested',['chat_id'=>$chat,'model'=>$this->c['image_model']]);
@@ -104,6 +108,7 @@ final class Ahmad {
         }
         $called=str_contains($text,'استاد احمد') || (!empty($this->c['bot_username']) && stripos($text,'@'.$this->c['bot_username'])!==false) || (!empty($this->c['bot_username']) && strcasecmp($m['reply_to_message']['from']['username']??'', $this->c['bot_username'])===0) || ($m['chat']['type']??'')==='private';
         if (!$called || $text==='') { $this->log('message.no_reply',['chat_id'=>$chat]); return; } $this->log('ai.triggered',['chat_id'=>$chat,'message_id'=>$mid]);
+        if (!$this->queue->allow('chat',$user,$this->c['chat_limit'],60)) { $this->send($chat,'پیام‌ها خیلی سریع رسیدند؛ لطفاً کمی بعد دوباره تلاش کن.',$mid); return; }
         if (!$this->c['ai_url'] || !$this->c['ai_key'] || !$this->c['ai_model']) { $this->send($chat,'هوش مصنوعی هنوز تنظیم نشده است.',$mid); return; }
         try {
             $msgs=ConversationPrompt::build($this->memory->recent($chat,$user),$text);
@@ -116,5 +121,18 @@ final class Ahmad {
         } catch(Throwable $e) { $this->log('ai.error',['error'=>$e->getMessage()]); $this->send($chat,'در حال حاضر پاسخ‌گویی ممکن نیست؛ لطفاً بعداً تلاش کنید.',$mid); }
 
     }
-    public function poll(): void { $this->log('poll.start',['timezone'=>$this->c['timezone']]); while (true) { try { $this->api('deleteWebhook',[]); break; } catch (Throwable $e) { $this->log('poll.startup_retry',['error'=>$e->getMessage(),'retry_seconds'=>5]); sleep(5); } } $offset=(int)$this->query('SELECT COALESCE(MAX(id),-1)+1 FROM updates')->fetchColumn(); while(true) { try { $r=$this->api('getUpdates',['offset'=>$offset,'timeout'=>30]); foreach($r['result']??[] as $u) { $this->handle($u); $offset=max($offset,$u['update_id']+1); } } catch(Throwable $e) { $this->log('poll.error',['error'=>$e->getMessage()]); sleep(3); } } }
+    public function enqueue(array $update): void { $this->queue->enqueue($update); }
+    public function workOne(): bool { $this->queue->recover(); return $this->queue->processOne(function(array $update): void { try { $this->handle($update); } catch(Throwable $e) { $this->query('DELETE FROM updates WHERE id=?',[$update['update_id']]); throw $e; } }); }
+    public function poll(): void {
+        $this->log('poll.start',['timezone'=>$this->c['timezone']]);
+        while(true) { try { $this->api('deleteWebhook',[]); break; } catch(Throwable $e) { $this->log('poll.startup_retry',['error'=>$e->getMessage()]); sleep(5); } }
+        $offset=$this->queue->offset();
+        while(true) {
+            try {
+                while($this->workOne()) {}
+                $response=$this->api('getUpdates',['offset'=>$offset,'timeout'=>5]);
+                foreach($response['result']??[] as $update) { $this->enqueue($update); $offset=max($offset,(int)$update['update_id']+1); }
+            } catch(Throwable $e) { $this->log('poll.error',['error'=>$e->getMessage()]); sleep(3); }
+        }
+    }
 }

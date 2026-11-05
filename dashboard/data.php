@@ -9,7 +9,7 @@ try {
     $db = new PDO('sqlite:'.$config['db'], null, null, [PDO::ATTR_ERRMODE=>PDO::ERRMODE_EXCEPTION]);
     $db->exec('PRAGMA query_only=ON; PRAGMA busy_timeout=2000');
     $has = static function(string $table) use ($db): bool { $s=$db->prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name=?"); $s->execute([$table]); return (bool)$s->fetchColumn(); };
-    $messages = $has('messages') ? $db->query('SELECT name,text,at,chat FROM messages ORDER BY id DESC LIMIT 60')->fetchAll(PDO::FETCH_ASSOC) : [];
+    $messages = $has('messages') && $has('observed_users') ? $db->query('SELECT m.name,m.text,m.at,m.chat,m.user_id,u.username FROM messages m LEFT JOIN observed_users u ON u.chat=m.chat AND u.user_id=m.user_id ORDER BY m.id DESC LIMIT 60')->fetchAll(PDO::FETCH_ASSOC) : [];
     $memory = $has('conversation_turns') ? $db->query('SELECT role,content,at,chat,user_id FROM conversation_turns ORDER BY id DESC LIMIT 60')->fetchAll(PDO::FETCH_ASSOC) : [];
     $stats = []; foreach (['messages','roster','attendance','conversation_turns'] as $table) $stats[$table] = $has($table) ? (int)$db->query('SELECT COUNT(*) FROM '.$table)->fetchColumn() : 0;
     $logFile = __DIR__.'/../data/bot.log'; $logs = [];

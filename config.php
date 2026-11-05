@@ -24,5 +24,7 @@ return [
     'image_url' => rtrim(getenv('IMAGE_BASE_URL') ?: (getenv('IMAGE_PROVIDER') === 'cloudflare' ? '' : (getenv('AI_BASE_URL') ?: '')), '/'),
     'image_key' => getenv('IMAGE_API_KEY') ?: (getenv('IMAGE_PROVIDER') === 'cloudflare' ? '' : (getenv('AI_API_KEY') ?: '')),
     'cloudflare_account' => getenv('CLOUDFLARE_ACCOUNT_ID') ?: '',
+    'chat_limit' => max(0, (int)(getenv('CHAT_RATE_LIMIT') !== false ? getenv('CHAT_RATE_LIMIT') : 10)),
+    'image_limit' => max(0, (int)(getenv('IMAGE_RATE_LIMIT') !== false ? getenv('IMAGE_RATE_LIMIT') : 5)),
     'webhook_secret' => getenv('WEBHOOK_SECRET') ?: '',
 ];

@@ -8,6 +8,13 @@ final class Memory
         $this->db->exec('CREATE TABLE IF NOT EXISTS conversation_turns (id INTEGER PRIMARY KEY, chat INTEGER NOT NULL, user_id INTEGER NOT NULL, role TEXT NOT NULL, content TEXT NOT NULL, at INTEGER NOT NULL)');
         $this->db->exec('CREATE INDEX IF NOT EXISTS conversation_scope ON conversation_turns(chat,user_id,id)');
         $this->db->exec('CREATE INDEX IF NOT EXISTS messages_scope ON messages(chat,user_id,at)');
+        $this->db->exec('CREATE TABLE IF NOT EXISTS observed_users (chat INTEGER NOT NULL, user_id INTEGER NOT NULL, username TEXT, first_name TEXT, last_name TEXT, first_seen INTEGER NOT NULL, last_seen INTEGER NOT NULL, PRIMARY KEY(chat,user_id))');
+    }
+
+    public function observeUser(int $chat, array $user, int $at): void
+    {
+        $statement = $this->db->prepare('INSERT INTO observed_users(chat,user_id,username,first_name,last_name,first_seen,last_seen) VALUES(?,?,?,?,?,?,?) ON CONFLICT(chat,user_id) DO UPDATE SET username=excluded.username, first_name=excluded.first_name, last_name=excluded.last_name, last_seen=MAX(observed_users.last_seen,excluded.last_seen) WHERE excluded.last_seen>=observed_users.last_seen');
+        $statement->execute([$chat, (int)$user['id'], $user['username'] ?? null, $user['first_name'] ?? null, $user['last_name'] ?? null, $at, $at]);
     }
 
     public function remember(int $chat, int $user, string $role, string $content): void
