@@ -21,8 +21,15 @@ final class ImageProvider
             $body=['model'=>$model,'prompt'=>$prompt];
         } else throw new RuntimeException('Unknown image provider');
         if (!filter_var($url,FILTER_VALIDATE_URL)) throw new RuntimeException('Invalid image endpoint');
-        $ch=curl_init($url); curl_setopt_array($ch,[CURLOPT_POST=>true,CURLOPT_POSTFIELDS=>json_encode($body,JSON_UNESCAPED_UNICODE),CURLOPT_HTTPHEADER=>['Content-Type: application/json','Authorization: Bearer '.$key],CURLOPT_RETURNTRANSFER=>true,CURLOPT_TIMEOUT=>120]);
-        $result=curl_exec($ch); $status=curl_getinfo($ch,CURLINFO_HTTP_CODE); $type=curl_getinfo($ch,CURLINFO_CONTENT_TYPE) ?: ''; $error=curl_error($ch); curl_close($ch);
+        $multipart=$provider==='cloudflare' && (str_contains($model,'/flux-2-klein-4b') || str_contains($model,'/flux-2-dev'));
+        $headers=['Authorization: Bearer '.$key];
+        if (!$multipart) $headers[]='Content-Type: application/json';
+        for ($attempt=1; $attempt<=3; $attempt++) {
+            $ch=curl_init($url); curl_setopt_array($ch,[CURLOPT_POST=>true,CURLOPT_POSTFIELDS=>$multipart ? $body : json_encode($body,JSON_UNESCAPED_UNICODE),CURLOPT_HTTPHEADER=>$headers,CURLOPT_RETURNTRANSFER=>true,CURLOPT_CONNECTTIMEOUT=>15,CURLOPT_TIMEOUT=>120]);
+            $result=curl_exec($ch); $status=curl_getinfo($ch,CURLINFO_HTTP_CODE); $type=curl_getinfo($ch,CURLINFO_CONTENT_TYPE) ?: ''; $error=curl_error($ch); $errno=curl_errno($ch); curl_close($ch);
+            if ($result===false && in_array($errno,[6,7,35],true) && $attempt<3) { error_log('[ahmad] image.provider_retry '.json_encode(['attempt'=>$attempt,'curl_code'=>$errno])); sleep($attempt*2); continue; }
+            break;
+        }
         if ($result===false || $status>=400) throw new RuntimeException('Image provider HTTP '.$status.' '.$error);
         if (str_starts_with(strtolower($type),'image/')) return ['b64_json'=>base64_encode($result)];
         $json=json_decode($result,true);
