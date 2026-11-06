@@ -71,3 +71,17 @@ Set `VISION_MODEL` to an image-input model supported by the chat provider at `AI
 ## Web search and voice
 
 Set `BRAVE_SEARCH_API_KEY` to enable `/web query`, which returns up to five results and links from Brave Search. Search terms are sent to Brave. Set `VOICE_MODEL` to a transcription model supported by an OpenAI-compatible `/audio/transcriptions` provider; optionally set `VOICE_BASE_URL` and `VOICE_API_KEY` separately (otherwise the chat base and key are used). Voice messages in private chats and replies to the bot in groups are downloaded (maximum 10 MB), sent to the transcription provider, then handled as a question. Audio bytes are deleted from temporary storage after transcription. Providers may retain data according to their own policies.
+
+## Controlling AI usage
+
+Chat context defaults to the last 6 turns and at most 3,000 characters of history. Up to two matching older messages and a teacher note can be added separately. Messages longer than 4,000 characters are rejected with a request to shorten them. The default output cap is 300 tokens. Configure `AI_HISTORY_TURNS`, `AI_HISTORY_CHARS`, `AI_MESSAGE_CHARS`, and `AI_MAX_OUTPUT_TOKENS` in `.env`; set the output cap to 0 if your provider rejects `max_tokens`. Character limits are not exact token counts, especially for Persian. Provider usage is logged when the API supplies it; streaming providers may not supply usage. These controls apply to standard chat, not image generation, image translation, vision, transcription or search, which may be separately metered. Existing stored messages are not deleted.
+
+Students can reply to a bot message in a group with `نام خانوادگی حاضر`. A check-in is saved by user ID and group with its timestamp; one check-in is accepted per user per day. If a schedule exists, check-in must occur during a scheduled window; without a schedule it is accepted at any time. Staff can request `/report` or ask who was present; when reply check-ins exist, the report lists those check-ins. Names are self-declared and require teacher verification. Set `BOT_USERNAME` so replies to the bot can be recognized.
+
+## Gemini image fallback
+
+Set `GEMINI_IMAGE_API_KEY` and `GEMINI_IMAGE_MODEL` (for example `gemini-3.1-flash-lite-image`) to enable the fallback. When the primary image provider fails, the bot tries Gemini; Gemini API use can incur charges. Cloudflare's confirmed daily quota error 3036 is persisted until midnight UTC (03:30 Tehran), after which Cloudflare is tried again. Temporary errors do not lock it for the day. Configure the model and billing access in Google AI Studio; a Gemini app subscription does not necessarily include API credits.
+
+To use Gemini only for image generation, set `IMAGE_PROVIDER=gemini`, `GEMINI_IMAGE_API_KEY`, and `GEMINI_IMAGE_MODEL`. In this mode Cloudflare is not called and the `IMAGE_MODEL` setting is ignored. API billing may apply.
+
+Staff can save a group-specific instruction by addressing the bot with `یادت باشه ...`. Use `/memories` to list the latest ten instructions and `/forgetrule ID` to remove one. These are supplied to the chat model, so responses are not guaranteed to follow them exactly and they do not prevent image-generation commands. Private chat and each group have separate instructions. Do not include sensitive data.

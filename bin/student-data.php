@@ -9,7 +9,7 @@ $db = new PDO('sqlite:'.$config['db'], null, null, [PDO::ATTR_ERRMODE=>PDO::ERRM
 $id = (int)$argv[2];
 if ($argv[1] === 'export') {
     $result = [];
-    foreach (['messages', 'conversation_turns', 'roster', 'corrections', 'observed_users', 'student_notes'] as $table) {
+    foreach (['messages', 'conversation_turns', 'roster', 'corrections', 'observed_users', 'student_notes', 'reply_checkins'] as $table) {
         $exists=$db->prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name=?"); $exists->execute([$table]);
         if (!$exists->fetchColumn()) continue;
         $q=$db->prepare('SELECT * FROM '.$table.' WHERE user_id=?'); $q->execute([$id]); $result[$table]=$q->fetchAll(PDO::FETCH_ASSOC);
@@ -25,7 +25,7 @@ $db->beginTransaction();
 try {
     $exists=$db->query("SELECT 1 FROM sqlite_master WHERE type='table' AND name='session_attendance'")->fetchColumn(); if ($exists) { $q=$db->prepare('DELETE FROM session_attendance WHERE student IN (SELECT id FROM roster WHERE user_id=?)'); $q->execute([$id]); }
     $q=$db->prepare('DELETE FROM attendance WHERE student IN (SELECT id FROM roster WHERE user_id=?)'); $q->execute([$id]);
-    foreach (['messages','conversation_turns','corrections','roster','observed_users', 'student_notes'] as $table) {
+    foreach (['messages','conversation_turns','corrections','roster','observed_users', 'student_notes', 'reply_checkins'] as $table) {
         $exists=$db->prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name=?"); $exists->execute([$table]);
         if ($exists->fetchColumn()) { $q=$db->prepare('DELETE FROM '.$table.' WHERE user_id=?'); $q->execute([$id]); }
     }

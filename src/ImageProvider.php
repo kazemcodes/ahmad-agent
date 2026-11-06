@@ -30,6 +30,7 @@ final class ImageProvider
             if ($result===false && in_array($errno,[6,7,35],true) && $attempt<3) { error_log('[ahmad] image.provider_retry '.json_encode(['attempt'=>$attempt,'curl_code'=>$errno])); sleep($attempt*2); continue; }
             break;
         }
+        if ($provider==='cloudflare' && $status===429 && is_string($result)) { $failure=json_decode($result,true); foreach(($failure['errors']??[]) as $item) if ((int)($item['code']??0)===3036) throw new CloudflareQuotaExceeded('Cloudflare daily quota exhausted'); }
         if ($result===false || $status>=400) throw new RuntimeException('Image provider HTTP '.$status.' '.$error);
         if (str_starts_with(strtolower($type),'image/')) return ['b64_json'=>base64_encode($result)];
         $json=json_decode($result,true);
