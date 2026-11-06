@@ -1,6 +1,6 @@
 # Bale Bot API reference
 
-This project reference describes the Bale Bot API and its use by استاد احمد. The authoritative, complete and current reference is [Bale's official bot documentation](https://docs.bale.ai/). This document is a guide and index, not a verbatim copy; consult the official documentation for every field, parameter, limit, and API change.
+This project reference describes the Bale Bot API and its use by آقای ناظر. The authoritative, complete and current reference is [Bale's official bot documentation](https://docs.bale.ai/). This document is a guide and index, not a verbatim copy; consult the official documentation for every field, parameter, limit, and API change.
 
 ## Getting started
 
@@ -25,7 +25,7 @@ Bale documents a queue of the latest 2,000 updates for up to 24 hours. `update_i
 
 A message can include `message_id`, `from`, `date`, `chat`, `text`, entities, media, and `reply_to_message`. User objects identify accounts by `id` and may include `first_name`, `last_name`, `username`, and `is_bot`. A chat has an `id` and `type`. Consult the official Message and MessageEntity sections for availability and types before relying on a field. User names are display data; use numeric IDs for permissions.
 
-A mention, bot name in text, and a reply are separate triggers. The current application matches `استاد احمد`, the configured `BOT_USERNAME`, and replies whose sender username matches the configured bot. Messages are recorded only when Bale delivers them to this bot.
+A mention, bot name in text, and a reply are separate triggers. The current application matches `آقای ناظر`, the configured `BOT_USERNAME`, and replies whose sender username matches the configured bot. Messages are recorded only when Bale delivers them to this bot.
 
 ## Common methods
 

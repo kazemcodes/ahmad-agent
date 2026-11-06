@@ -1,4 +1,4 @@
-# استاد احمد
+# آقای ناظر
 
 A PHP 8.2+ Bale classroom bot. Requires curl, PDO SQLite and mbstring.
 

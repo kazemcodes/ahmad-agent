@@ -9,7 +9,7 @@ final class ClassInstructions
     public static function parse(string $text): ?string
     {
         $text=trim(str_replace(['ي','ك','‌'],['ی','ک',' '],$text));
-        if (!preg_match('/^(?:استاد\s+احمد[،,:\s]*)?یادت\s+باشه[،,:\s]+(.+)$/us',$text,$m)) return null;
+        if (!preg_match('/^(?:آقای\s+ناظر[،,:\s]*)?یادت\s+باشه[،,:\s]+(.+)$/us',$text,$m)) return null;
         $note=trim($m[1]); return $note!=='' ? $note : null;
     }
     public function add(int $chat,int $author,string $instruction): int

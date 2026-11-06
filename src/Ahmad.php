@@ -59,8 +59,8 @@ final class Ahmad {
         $name=trim(($m['from']['first_name']??'').' '.($m['from']['last_name']??'')); $this->log('message.received',['chat_id'=>$chat,'user_id'=>$user,'message_id'=>$mid,'text_length'=>mb_strlen($text),'chat_type'=>$m['chat']['type']??'unknown']);
         $this->memory->observeUser($chat,$m['from'],$at);
         $this->query('INSERT INTO messages(chat,user_id,name,text,at) VALUES(?,?,?,?,?)',[$chat,$user,$name,$text,$at]);
-        if ($text==='/start' || $text==='/help') { $this->send($chat,"سلام، من استاد احمد هستم. دانش‌آموزان در زمان کلاس نام خود را بفرستند.\nدستورات معلم: /class HH:MM HH:MM ، /roster نام‌ها (هر نام در یک خط)، /report ، /rename نام قدیم | نام جدید.\nبرای پرسش مرا با «استاد احمد» صدا بزنید یا به پیام من پاسخ دهید.",$mid); return; }
-        $addressed=str_contains($text,'استاد احمد') || (!empty($this->c['bot_username']) && stripos($text,'@'.$this->c['bot_username'])!==false) || (!empty($this->c['bot_username']) && strcasecmp($m['reply_to_message']['from']['username']??'', $this->c['bot_username'])===0) || ($m['chat']['type']??'')==='private';
+        if ($text==='/start' || $text==='/help') { $this->send($chat,"سلام، من آقای ناظر هستم. دانش‌آموزان در زمان کلاس نام خود را بفرستند.\nدستورات معلم: /class HH:MM HH:MM ، /roster نام‌ها (هر نام در یک خط)، /report ، /rename نام قدیم | نام جدید.\nبرای پرسش مرا با «آقای ناظر» صدا بزنید یا به پیام من پاسخ دهید.",$mid); return; }
+        $addressed=str_contains($text,'آقای ناظر') || (!empty($this->c['bot_username']) && stripos($text,'@'.$this->c['bot_username'])!==false) || (!empty($this->c['bot_username']) && strcasecmp($m['reply_to_message']['from']['username']??'', $this->c['bot_username'])===0) || ($m['chat']['type']??'')==='private';
         $isBotReply=!empty($this->c['bot_username']) && strcasecmp($m['reply_to_message']['from']['username']??'', $this->c['bot_username'])===0;
         $checkinName=$isBotReply ? AttendanceCheckIn::name($text) : null;
         if ($checkinName !== null && ($m['chat']['type']??'')!=='private') {
@@ -159,7 +159,7 @@ final class Ahmad {
                 $file=$this->api('getFile',['file_id'=>$photo['file_id']]); $path=$file['result']['file_path']??'';
                 $uri=(new BaleImageReader($this->c['bale_token']))->dataUri($path);
                 $question=$text!==''?$text:'این تصویر را به زبان ساده توضیح بده.';
-                $response=$this->http($this->c['ai_url'].'/chat/completions',['model'=>$this->c['vision_model'],'stream'=>false,'messages'=>[['role'=>'system','content'=>'تو استاد احمد، دستیار آموزشی هستی. به سؤال درباره تصویر دقیق و صادقانه پاسخ بده و اگر چیزی واضح نیست بگو.'],['role'=>'user','content'=>[['type'=>'text','text'=>$question],['type'=>'image_url','image_url'=>['url'=>$uri]]]]]],['Authorization: Bearer '.$this->c['ai_key']]);
+                $response=$this->http($this->c['ai_url'].'/chat/completions',['model'=>$this->c['vision_model'],'stream'=>false,'messages'=>[['role'=>'system','content'=>'تو آقای ناظر، دستیار آموزشی هستی. به سؤال درباره تصویر دقیق و صادقانه پاسخ بده و اگر چیزی واضح نیست بگو.'],['role'=>'user','content'=>[['type'=>'text','text'=>$question],['type'=>'image_url','image_url'=>['url'=>$uri]]]]]],['Authorization: Bearer '.$this->c['ai_key']]);
                 $answer=$response['choices'][0]['message']['content']??null; if (!is_string($answer) || trim($answer)==='') throw new RuntimeException('Vision model returned no text');
                 $this->send($chat,$answer,$mid); $this->memory->remember($chat,$user,'user','[سؤال درباره تصویر] '.$question); $this->memory->remember($chat,$user,'assistant',$answer);
             } catch(Throwable $e) { $this->log('vision.error',['error'=>$e->getMessage()]); $this->send($chat,'نتوانستم این تصویر را بررسی کنم؛ لطفاً دوباره تلاش کن.',$mid); }
@@ -168,7 +168,7 @@ final class Ahmad {
         $imagePrompt = null;
         if (preg_match('~^/image(?:@\w+)?\s+([\s\S]+)$~u', $text, $image)) {
             $imagePrompt = trim($image[1]);
-        } elseif (preg_match('~(?:عکس|تصویر|نقاشی)~u', $text) && preg_match('~(?:بساز|بکش|تولید کن|درست کن|ایجاد کن|بفرست|میخوام|می‌خوام|میخواهم)~u', $text) && (($m['chat']['type']??'')==='private' || str_contains($text,'استاد احمد') || (!empty($this->c['bot_username']) && stripos($text,'@'.$this->c['bot_username'])!==false) || (!empty($this->c['bot_username']) && strcasecmp($m['reply_to_message']['from']['username']??'', $this->c['bot_username'])===0))) {
+        } elseif (preg_match('~(?:عکس|تصویر|نقاشی)~u', $text) && preg_match('~(?:بساز|بکش|تولید کن|درست کن|ایجاد کن|بفرست|میخوام|می‌خوام|میخواهم)~u', $text) && (($m['chat']['type']??'')==='private' || str_contains($text,'آقای ناظر') || (!empty($this->c['bot_username']) && stripos($text,'@'.$this->c['bot_username'])!==false) || (!empty($this->c['bot_username']) && strcasecmp($m['reply_to_message']['from']['username']??'', $this->c['bot_username'])===0))) {
             $imagePrompt = $text;
         }
         if ($imagePrompt !== null) {
@@ -188,7 +188,7 @@ final class Ahmad {
             } catch(Throwable $e) { $this->log('image.error',['error'=>$e->getMessage()]); $this->send($chat,'ساخت یا ارسال تصویر ممکن نشد؛ لطفاً دوباره تلاش کنید.',$mid); }
             return;
         }
-        $called=!empty($m['voice']['file_id']) && $addressed || str_contains($text,'استاد احمد') || (!empty($this->c['bot_username']) && stripos($text,'@'.$this->c['bot_username'])!==false) || (!empty($this->c['bot_username']) && strcasecmp($m['reply_to_message']['from']['username']??'', $this->c['bot_username'])===0) || ($m['chat']['type']??'')==='private';
+        $called=!empty($m['voice']['file_id']) && $addressed || str_contains($text,'آقای ناظر') || (!empty($this->c['bot_username']) && stripos($text,'@'.$this->c['bot_username'])!==false) || (!empty($this->c['bot_username']) && strcasecmp($m['reply_to_message']['from']['username']??'', $this->c['bot_username'])===0) || ($m['chat']['type']??'')==='private';
         if (!$called || $text==='') { $this->log('message.no_reply',['chat_id'=>$chat]); return; } $this->log('ai.triggered',['chat_id'=>$chat,'message_id'=>$mid]);
         if (mb_strlen($text)>$this->c['message_chars']) { $this->send($chat,'پیامت خیلی طولانی است؛ لطفاً سؤال را کوتاه‌تر یا در چند بخش بفرست.',$mid); return; }
         if (!$this->queue->allow('chat',$user,$this->c['chat_limit'],60)) { $this->send($chat,'پیام‌ها خیلی سریع رسیدند؛ لطفاً کمی بعد دوباره تلاش کن.',$mid); return; }

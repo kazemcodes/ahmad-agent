@@ -51,7 +51,7 @@ final class Memory
     public function relevant(int $chat, int $user, string $query, int $limit = 4): array
     {
         $terms=preg_split('/[^\p{L}\p{N}]+/u',mb_strtolower($query),-1,PREG_SPLIT_NO_EMPTY);
-        $stop=['استاد','احمد','چیه','چیست','چطور','چگونه','برای','لطفا','بگو','میشه','سلام','کنم','کردم','بود','the','what','that','this'];
+        $stop=['آقای','ناظر','چیه','چیست','چطور','چگونه','برای','لطفا','بگو','میشه','سلام','کنم','کردم','بود','the','what','that','this'];
         $terms=array_slice(array_values(array_unique(array_filter($terms,fn($word)=>mb_strlen($word)>=3 && !in_array($word,$stop,true)))),0,8);
         if (!$terms) return [];
         $q=$this->db->prepare("SELECT id,content FROM conversation_turns WHERE chat=? AND user_id=? AND role='user' AND id NOT IN (SELECT id FROM conversation_turns WHERE chat=? AND user_id=? ORDER BY id DESC LIMIT 12) ORDER BY id DESC LIMIT 500");

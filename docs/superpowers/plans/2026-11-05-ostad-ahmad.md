@@ -1,4 +1,4 @@
-# استاد احمد implementation plan
+# آقای ناظر implementation plan
 
 1. Implement a PHP Bale HTTP client and SQLite persistence, with duplicate-update protection.
 2. Implement class configuration, roster management, attendance check-ins, corrections, and authorized reports.

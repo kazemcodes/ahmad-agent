@@ -1,4 +1,4 @@
-# استاد احمد — Deploy & Live Test
+# آقای ناظر — Deploy & Live Test
 
 ## Bale API (verified from docs.bale.ai)
 
@@ -17,7 +17,7 @@
 - The project was already ~90% built — this fix is the only code change needed
 
 ## 1. Create the bot
-1. In Bale, open **@botfather**, `/newbot`, name it **استاد احمد**, pick a `@username` (e.g. `@OstadAhmadBot`)
+1. In Bale, open **@botfather**, `/newbot`, name it **آقای ناظر**, pick a `@username` (e.g. `@OstadAhmadBot`)
 2. Save the token
 
 ## 2. Configure `.env`
@@ -54,7 +54,7 @@ In a test group with the bot added:
 - [ ] As student **inside class window**: send exact roster name → "حضورت ثبت شد"
 - [ ] Same name from a second account → "قبلاً به حساب دیگری متصل شده"
 - [ ] `/report` → attendance list + class-window message counts
-- [ ] As student: `استاد احمد سلام، این سوال را توضیح بده` → AI Persian answer
+- [ ] As student: `آقای ناظر سلام، این سوال را توضیح بده` → AI Persian answer
 - [ ] Reply to the bot's message → bot answers
 - [ ] `@OstadAhmadBot سلام` → bot answers
 - [ ] `/image یک منظره کوهستانی زیبا` → bot sends a photo (needs IMAGE_MODEL + HTTPS image URL from provider)
