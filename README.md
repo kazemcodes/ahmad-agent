@@ -4,11 +4,27 @@ A PHP 8.2+ Bale classroom bot. Requires curl, PDO SQLite and mbstring.
 
 Set environment variables `BALE_TOKEN`, `ADMIN_IDS` (comma-separated Bale numeric user IDs), `AI_BASE_URL`, `AI_API_KEY`, and `AI_MODEL`. Optional: `DB_PATH`, `TIMEZONE` (default Asia/Tehran). Run `php bin/poll.php`. Polling disables the existing webhook. Keep the SQLite data directory outside the web root and back it up securely.
 
-In a classroom group, an authorized staff member sends `/class 08:00 09:30`, then `/roster` followed by names separated by newlines or commas. Students send their exact roster name during the class window. `/report` reports today's check-ins and message counts; `/rename old name | new name` corrects a roster entry. Staff access is controlled by configured IDs, not AI claims. A missing check-in means unknown, not absent. The schedule applies every day and does not support overnight classes. Message activity is reported for the configured class window.
+### Multi-process mode (recommended, multi-group)
+
+Image generation is slow, so it runs in dedicated workers — slow images never block the poller or other chats:
+
+```bash
+php bin/poll.php                 # poller: only enqueues
+php bin/image-worker.php         # image worker slot 1
+php bin/image-worker.php 2       # image worker slot 2 (optional)
+```
+
+All roles have separate locks, so the poller and N image workers can run together; each image worker claims jobs atomically (`BEGIN IMMEDIATE`), so no image is generated twice. Queue position is shown to the user, and a user with an active image job gets a "already generating, please wait" reply instead of a duplicate job. The bot also sends `sendChatAction('upload_photo')` ("⏳ در حال ساخت تصویر…") when an image is requested and again when a worker starts it.
+
+Set `IMAGE_WORKERS` (default 2) for your process manager (systemd/supervisor/pm2) to know how many `bin/image-worker.php` processes to run.
+
+Legacy single-process mode: run only `php bin/poll.php` with `POLL_INLINE_IMAGES=1` in `.env` — the poller will also drain the image queue itself (still shows the typing indicator).
+
+In a classroom group, an authorized staff member sends `/class 08:00 09:30`, then `/roster` followed by names separated by newlines or commas. Students send their roster name (exact or fuzzy) during the class window (plus grace period). `/report` reports today's check-ins and message counts; `/rename old name | new name` corrects a roster entry. Staff access is controlled by configured IDs, not AI claims. A missing check-in means unknown, not absent. The schedule applies every day and does not support overnight classes. Message activity is reported for the configured class window.
 
 To use a webhook instead, serve `public/` over HTTPS, set `WEBHOOK_SECRET` to a long random value and register `https://your-host/webhook.php?secret=YOUR_SECRET` using Bale's `setWebhook`. Treat the URL as a credential. Do not run polling concurrently. Verify Bale group visibility before use.
 
-Current limitations: exact-name check-in only; name corrections require staff commands; chat history is sent to the AI provider. Class schedules, roles, data retention, and reporting need further work before use with real students. Secure deployment and school authorization are required.
+Current limitations: fuzzy name matching is enabled by default (set `FUZZY_MATCH=0` to disable); grace period defaults to 7 minutes (`GRACE_MINUTES`); chat history is sent to the AI provider. Video generation is not available yet; only image generation is supported. Class schedules, roles, data retention, and reporting need further work before use with real students. Secure deployment and school authorization are required.
 
 ## Configuration file
 
@@ -23,6 +39,8 @@ Bale API reference: [docs/BALE_BOT_API.md](docs/BALE_BOT_API.md), with a link to
 The bot keeps the last 12 conversation turns per user and chat for AI context, including its own answers. `/forget` clears that conversational memory for the sender in the current chat; it does not delete classroom messages or attendance. `/mysearch phrase` searches the sender's stored messages in the current chat. `/search phrase` searches that chat's messages and is restricted to configured staff IDs. Search results are posted in the chat where the command is issued, so use it only where all recipients may see the results. These searches query local SQLite messages, not the internet. The bot cannot recover messages Bale never delivered. Recent conversation is sent to the configured AI provider.
 
 ## Windows dashboard
+
+Dashboard actions (add roster/schedule) require `DASHBOARD_TOKEN` if set; otherwise localhost-only access is enough. Dashboard admin page: `http://127.0.0.1:8765/admin.html`.
 
 Double-click `Start Ahmad.bat` to start polling and open the local dashboard at `http://127.0.0.1:8765/`. Keep both command windows open; close them to stop the bot and dashboard. Start it only once, and do not run it alongside another polling process. The dashboard reads recent messages, conversation turns, and `data/bot.log`; it does not manage the bot process. Logs and student data stay on the computer, so protect access to this Windows account and its project folder. The dashboard is intended for a trusted local computer, not a shared or public server.
 
@@ -58,9 +76,9 @@ The bot stores text and media captions from messages Bale delivers, including th
 
 ## Queue and rate limits
 
-Incoming updates are stored in SQLite before processing. Polling processes them in order with one worker. Image requests default to five per user per hour and chat requests to ten per user per minute; set `IMAGE_RATE_LIMIT` and `CHAT_RATE_LIMIT` in `.env` to change them (zero disables a limit). Limits apply across chats for each Bale user ID. Excess requests receive a message; they are not queued for later. Attendance and staff commands are not subject to these AI limits.
+Incoming updates are stored in SQLite before processing. Polling processes them in order and enqueues them for the worker. Image requests default to five per user per hour and chat requests to ten per user per minute; set `IMAGE_RATE_LIMIT` and `CHAT_RATE_LIMIT` in `.env` to change them (zero disables a limit). Limits apply across chats for each Bale user ID. Excess requests receive a message; they are not queued for later. Attendance and staff commands are not subject to these AI limits.
 
-For webhook delivery, run `php bin/worker.php` continuously as well as the web server: the webhook only enqueues updates. Run only one poller or one webhook worker. A failed queue item is retried up to three times; failures may leave partial effects, including duplicate messages or sends. Provider errors caught inside a request are reported to the user rather than retried by the queue. Pending updates can wait behind a slow image generation; polling and processing share one process. Queue payloads are cleared on successful processing, while failed payloads remain in the database for diagnosis. Protect and back up the database accordingly.
+For webhook delivery, run `php bin/worker.php` continuously as well as the web server: the webhook only enqueues updates. With polling, run `php bin/poll.php` (enqueues) plus image workers. A failed queue item is retried up to three times; failures may leave partial effects, including duplicate messages or sends. Provider errors caught inside a request are reported to the user rather than retried by the queue. Slow image generation no longer blocks other updates: image jobs go to the separate `image_jobs` queue and are generated by `bin/image-worker.php` processes, so polling/chat/attendance in every group stay responsive even while many images are being created. New jobs show queue position, and scheduling sends a `sendChatAction('upload_photo')` typing indicator ("⏳ در حال ساخت تصویر…") both on enqueue and on job start. `IMAGE_WORKERS` controls how many worker slots your process manager runs (one per `php bin/image-worker.php N` invocation). Legacy mode with a single poller that also drains images: `POLL_INLINE_IMAGES=1`. Queue payloads are cleared on successful processing, while failed payloads remain in the database for diagnosis. Protect and back up the database accordingly.
 
 Teachers can set a short educational preference for a linked student in a group with `/setnote USER_ID description` and remove it with `/clearnote USER_ID`. The note is included in that student's AI context and sent to the configured provider; avoid sensitive information. `/today` reports today's schedule. Student-data export and deletion include these notes.
 

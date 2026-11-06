@@ -38,4 +38,11 @@ return [
     'chat_limit' => max(0, (int)(getenv('CHAT_RATE_LIMIT') !== false ? getenv('CHAT_RATE_LIMIT') : 10)),
     'image_limit' => max(0, (int)(getenv('IMAGE_RATE_LIMIT') !== false ? getenv('IMAGE_RATE_LIMIT') : 5)),
     'webhook_secret' => getenv('WEBHOOK_SECRET') ?: '',
+    'grace_minutes' => max(0, min(30, (int)(getenv('GRACE_MINUTES') !== false ? getenv('GRACE_MINUTES') : 7))),
+    'fuzzy_match' => getenv('FUZZY_MATCH') !== '0',
+    'dashboard_token' => getenv('DASHBOARD_TOKEN') ?: '',
+    // '1' = legacy all-in-one poll.php also drains image jobs inline.
+    // In the multi-process setup, bin/image-worker.php drains them instead.
+    'poll_inline_images' => getenv('POLL_INLINE_IMAGES') === '1',
+    'image_workers' => max(1, min(16, (int)(getenv('IMAGE_WORKERS') !== false ? getenv('IMAGE_WORKERS') : 2))),
 ];

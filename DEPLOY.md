@@ -36,11 +36,22 @@ TIMEZONE=Asia/Tehran
 ```
 
 ## 3. Run (polling — easiest for local/VPS)
+
+Multi-process mode (recommended — images never block the poller):
 ```bash
-php bin/poll.php
+php bin/poll.php                 # poller only
+php bin/image-worker.php         # image worker, slot 1
+php bin/image-worker.php 2       # image worker, slot 2 (optional)
 ```
+Set `IMAGE_WORKERS` in `.env` to match how many `image-worker.php` processes your process manager runs. All roles have separate locks, so the poller and N image workers run together.
+
+*Legacy single-process mode:* `POLL_INLINE_IMAGES=1` + only `php bin/poll.php`.
 
 ## 4. Run (webhook — for production HTTPS)
+
+For webhook, run `php bin/worker.php` continuously (fast queue) plus `php bin/image-worker.php` (image queue).
+
+Image requests show "⏳ در حال ساخت تصویر…" (`sendChatAction('upload_photo')`) on enqueue and on job start, queue position if not first, and "already generating" if the same user+chat already has an active job (no duplicate generation, no user spam).
 1. Serve only `public/` from web root (never project root)
 2. Register: `curl "https://tapi.bale.ai/bot<TOKEN>/setWebhook?url=https://your-host/webhook.php?secret=<WEBHOOK_SECRET>"`
 3. **Never run both at once** — polling calls `deleteWebhook` on startup
