@@ -6,6 +6,7 @@ import express, { type Request, type Response } from 'express';
 import type { Db } from '../db.js';
 import type { Config } from '../config.js';
 import { nowSec } from '../logger.js';
+import { getLocalIp } from '../uptime.js';
 
 function hasTable(db: Db, table: string): boolean {
   const row = db.prepare("SELECT 1 AS x FROM sqlite_master WHERE type='table' AND name=?").get(table) as
@@ -101,7 +102,11 @@ export function createDashboardApp(db: Db, c: Config, dashboardDir: string, logF
         fs.closeSync(fd);
         logs = buf.toString('utf8').trim().split('\n').slice(-80);
       }
-      res.json({ ready: true, messages, memory, stats, logs, roster, schedules, corrections, attendanceToday });
+      res.json({
+        ready: true,
+        messages, memory, stats, logs, roster, schedules, corrections, attendanceToday,
+        server: { ip: getLocalIp(), port: c.port, uptime: Math.floor(process.uptime()) },
+      });
     } catch (e) {
       console.error(e);
       res.status(500).json({ error: 'خواندن اطلاعات ممکن نشد.' });
@@ -174,7 +179,14 @@ export function startDashboard(
   const app = createDashboardApp(db, c, dashboardDir, logFile);
   const host = c.dashboard_token ? '0.0.0.0' : '127.0.0.1';
   const server = app.listen(c.port, host, () => {
+    const ip = getLocalIp();
     console.log(`[ahmad] dashboard listening on ${host}:${c.port}`);
+    console.log(`[ahmad] dashboard URL: http://${ip}:${c.port} (local)`);
+    if (c.dashboard_token) {
+      console.log(`[ahmad] dashboard token protection: enabled`);
+    } else {
+      console.log(`[ahmad] dashboard: localhost only (set DASHBOARD_TOKEN for external access)`);
+    }
   });
   return server.listen.bind(server) as unknown as ReturnType<typeof express>['listen'];
 }

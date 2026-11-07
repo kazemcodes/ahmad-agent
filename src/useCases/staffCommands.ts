@@ -9,11 +9,13 @@ export const staffCommands: UseCase = async (ctx: ChatContext, deps: Deps) => {
   const m = ctx.effectiveText.match(STAFF_RE);
   if (!m) return false;
   const { chat, user, mid } = ctx;
-  if (!deps.staff(user)) {
+  const cmd = m[1]!;
+  // /report is public — anyone can check today's attendance.
+  const isPublic = cmd === 'report';
+  if (!isPublic && !deps.staff(user)) {
     await deps.send(chat, 'این دستور فقط برای معلم یا مدیر مجاز است.', mid);
     return true;
   }
-  const cmd = m[1]!;
   const arg = (m[2] ?? '').trim();
   const repos = buildRepositories(deps.db);
 
