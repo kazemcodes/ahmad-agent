@@ -147,7 +147,14 @@ export class AttendanceRepo {
     );
   }
   addReplyCheckin(chat: number, day: string, user: number, name: string, at: number): void {
-    runSql(this.db, 'INSERT OR IGNORE INTO reply_checkins(chat,day,user_id,name,at) VALUES(?,?,?,?,?)', chat, day, user, name, at);
+    // Upsert: a second check-in with a different name replaces the first one
+    // (so the user can correct their name during the day).
+    runSql(
+      this.db,
+      `INSERT INTO reply_checkins(chat,day,user_id,name,at) VALUES(?,?,?,?,?)
+       ON CONFLICT(chat,day,user_id) DO UPDATE SET name=excluded.name, at=excluded.at`,
+      chat, day, user, name, at,
+    );
   }
   messageCountsInWindows(chat: number, windows: Array<{ start: string; end: string }>, day: string): Row[] {
     if (!windows.length) return [];

@@ -13,7 +13,7 @@ export const replyCheckIn: UseCase = async (ctx: ChatContext, deps: Deps) => {
   const repos = buildRepositories(deps.db);
   const day = ymd(ctx.at);
   const existing = repos.attendance.replyExisting(ctx.chat, day, ctx.user);
-  if (existing) {
+  if (existing && existing.name === name) {
     await deps.send(
       ctx.chat,
       `✅ ${existing.name} عزیز، حضورت قبلاً ساعت ${hhmm(Number(existing.at))} ثبت شده است.`,
