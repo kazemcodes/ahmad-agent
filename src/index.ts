@@ -111,6 +111,20 @@ async function pollLoop(bot: Ahmad, logger: Logger): Promise<void> {
   const http = new (await import('./http.js')).HttpClient(logger);
   const bale = new (await import('./bale.js')).BaleClient(http, config.bale_token);
   let offset = Math.max(bot.queueOffset(), bot.seenOffset());
+  // Flush any backlog: fetch latest update_id and jump past everything old.
+  try {
+    const probe = await bale.getUpdates(offset, 1);
+    if (probe?.result?.length) {
+      const latest = Math.max(...probe.result.map((u: any) => Number(u.update_id)));
+      if (latest >= offset) {
+        const skipped = latest - offset;
+        offset = latest + 1;
+        logger.log('poll.backlog_flushed', { skipped, from: offset - 1 });
+      }
+    }
+  } catch (e) {
+    logger.log('poll.backlog_probe_failed', { error: e instanceof Error ? e.message : String(e) });
+  }
   while (true) {
     try {
       while (await bot.drainFastQueue()) {}

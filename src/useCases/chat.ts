@@ -2,7 +2,9 @@ import { extractCompletion } from '../aiCompletion.js';
 import { budgetHistory } from '../contextBudget.js';
 import { buildPrompt } from '../conversationPrompt.js';
 import type { ChatContext, Deps, UseCase } from '../context.js';
+import { isRateLimit } from '../http.js';
 import { cpLen, substr } from '../util.js';
+import { sleep } from '../logger.js';
 
 export const chatCmd: UseCase = async (ctx: ChatContext, deps: Deps) => {
   const { chat, user, mid, text, name } = ctx;
@@ -80,7 +82,7 @@ export const chatCmd: UseCase = async (ctx: ChatContext, deps: Deps) => {
     for (const provider of providers) {
       const payload: Record<string, unknown> = { model: provider.model, messages: msgs, stream: false };
       if (deps.config.max_output_tokens > 0) payload.max_tokens = deps.config.max_output_tokens;
-      for (let attempt = 0; attempt < 2; attempt++) {
+      for (let attempt = 0; attempt < 3; attempt++) {
         let response: any;
         try {
           response = await deps.http.http(`${provider.url}/chat/completions`, payload, {
@@ -88,6 +90,12 @@ export const chatCmd: UseCase = async (ctx: ChatContext, deps: Deps) => {
           });
         } catch (e) {
           lastErr = e;
+          if (isRateLimit(e) && attempt < 2) {
+            const wait = 5000 * (attempt + 1); // 5s, 10s
+            deps.log('ai.rate_limited', { provider: provider.name, wait_ms: wait, attempt });
+            await sleep(wait);
+            continue;
+          }
           deps.log(`ai.provider_failed ${provider.name}`, { error: e instanceof Error ? e.message : String(e) });
           break; // try next provider
         }

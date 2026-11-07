@@ -146,6 +146,37 @@ export class Ahmad {
     this.memory.observeUser(chat, m.from, at);
     this.db.prepare('INSERT INTO messages(chat,user_id,name,text,at) VALUES(?,?,?,?,?)').run(chat, user, name, text, at);
 
+    // Banned users (spam) — silently ignore.
+    {
+      const { buildRepositories } = await import('./repositories.js');
+      const until = buildRepositories(this.db).updates.bannedUntil(chat, user, nowSec());
+      if (until !== null) {
+        this.log('message.banned', { chat_id: chat, user_id: user, until });
+        return;
+      }
+    }
+
+    // Anti-spam: ≥5 identical messages within 60s → ban for 1 year.
+    if (text !== '') {
+      const dupes = this.db
+        .prepare('SELECT COUNT(*) AS n FROM messages WHERE chat=? AND user_id=? AND text=? AND at > ?')
+        .get(chat, user, text, at - 60) as { n: number };
+      if (Number(dupes.n) >= 5) {
+        const { buildRepositories } = await import('./repositories.js');
+        buildRepositories(this.db).updates.banUser(chat, user, nowSec());
+        this.log('message.spam_ban', { chat_id: chat, user_id: user, dupes: Number(dupes.n) });
+        await this.send(chat, '🚫 پیام‌های مکرر ارسال شد. شما برای نیم ساعت محدود شده‌اید.', mid);
+        return;
+      }
+    }
+
+    // Skip messages that are older than 5 minutes — bot should not respond to old messages.
+    const MAX_AGE_SECONDS = 300;
+    if (nowSec() - at > MAX_AGE_SECONDS) {
+      this.log('message.stale', { chat_id: chat, message_id: mid, age_seconds: nowSec() - at });
+      return;
+    }
+
     const replyUsername: string = m.reply_to_message?.from?.username ?? '';
     const addressed =
       text.includes('آقای ناظر') ||

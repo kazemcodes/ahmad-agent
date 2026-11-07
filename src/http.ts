@@ -14,6 +14,37 @@ export function isForbidden(e: unknown): boolean {
   return e instanceof ForbiddenError || (e instanceof Error && /HTTP 403\b/.test(e.message));
 }
 
+/** Thrown on HTTP 429 — rate limited. Callers should retry with backoff. */
+export class RateLimitError extends Error {
+  readonly status = 429;
+  retryAfterMs: number;
+  constructor(message: string, retryAfterMs = 5000) {
+    super(message);
+    this.name = 'RateLimitError';
+    this.retryAfterMs = retryAfterMs;
+  }
+}
+
+export function isRateLimit(e: unknown): boolean {
+  return e instanceof RateLimitError || (e instanceof Error && /HTTP 429\b/.test(e.message));
+}
+
+/** Returns seconds remaining if `key` was rate-limited in the last minute. */
+const rateHits = new Map<string, number[]>();
+
+export function checkRateLimit(key: string, limit: number, windowSeconds = 60): { allowed: boolean; retryAfterMs: number } {
+  const now = Date.now();
+  const windowMs = windowSeconds * 1000;
+  const hits = (rateHits.get(key) ?? []).filter(t => now - t < windowMs);
+  if (hits.length >= limit) {
+    const oldest = hits[0]!;
+    return { allowed: false, retryAfterMs: oldest + windowMs - now };
+  }
+  hits.push(now);
+  rateHits.set(key, hits);
+  return { allowed: true, retryAfterMs: 0 };
+}
+
 export class HttpClient {
   constructor(private logger: Logger) {}
 
@@ -65,6 +96,11 @@ export class HttpClient {
       curl_error: '',
     });
     if (status === 403) throw new ForbiddenError(`${service} request failed: HTTP 403`);
+    if (status === 429) {
+      const retryAfter = res.headers?.get?.('retry-after');
+      const ms = retryAfter ? Number(retryAfter) * 1000 : 5000;
+      throw new RateLimitError(`${service} request failed: HTTP 429`, Number.isFinite(ms) ? ms : 5000);
+    }
     if (status >= 400) throw new Error(`${service} request failed: HTTP ${status}`);
     let json: any = null;
     try {

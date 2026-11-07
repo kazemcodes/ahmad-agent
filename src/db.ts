@@ -91,4 +91,8 @@ export function initSchema(db: Db): void {
   db.exec(
     'CREATE TABLE IF NOT EXISTS image_provider_state (provider TEXT PRIMARY KEY, blocked_until INTEGER NOT NULL)',
   );
+  // Spam bans — one row per (chat, user), `until` is a unix timestamp.
+  db.exec(
+    'CREATE TABLE IF NOT EXISTS spam_bans (chat INTEGER NOT NULL, user_id INTEGER NOT NULL, banned_at INTEGER NOT NULL, until INTEGER NOT NULL, PRIMARY KEY(chat,user_id))',
+  );
 }

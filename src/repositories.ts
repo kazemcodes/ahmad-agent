@@ -6,6 +6,24 @@ export type Row = Record<string, any>;
 
 export class UpdatesRepo {
   constructor(private db: Db) {}
+  /** Record that this user was flagged for spamming at `ts` (unix sec), banned until `ts + 30 minutes`. */
+  banUser(chat: number, user: number, ts: number): void {
+    runSql(
+      this.db,
+      `INSERT INTO spam_bans(chat,user_id,banned_at,until) VALUES(?,?,?,?)
+       ON CONFLICT(chat,user_id) DO UPDATE SET banned_at=excluded.banned_at, until=excluded.until`,
+      chat, user, ts, ts + 30 * 60,
+    );
+  }
+  /** If this user is currently banned, return the `until` timestamp; else null. */
+  bannedUntil(chat: number, user: number, now: number): number | null {
+    const row = queryOne<{ until: number }>(
+      this.db,
+      'SELECT until FROM spam_bans WHERE chat=? AND user_id=? AND until > ?',
+      chat, user, now,
+    );
+    return row ? Number(row.until) : null;
+  }
   seen(id: number): boolean {
     return !!queryOne(this.db, 'SELECT 1 AS x FROM updates WHERE id=?', id);
   }
