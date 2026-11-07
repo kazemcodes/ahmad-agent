@@ -130,7 +130,12 @@ export class AttendanceRepo {
     );
   }
   replyExisting(chat: number, day: string, user: number): Row | undefined {
-    return queryOne(this.db, 'SELECT name,at FROM reply_checkins WHERE chat=? AND day=? AND user_id=?', chat, day, user);
+    // Latest check-in for this user today (for the "already checked in" message).
+    return queryOne(
+      this.db,
+      'SELECT name,at FROM reply_checkins WHERE chat=? AND day=? AND user_id=? ORDER BY at DESC LIMIT 1',
+      chat, day, user,
+    );
   }
   listReplyToday(chat: number, day: string): Row[] {
     return queryAll(
@@ -147,12 +152,14 @@ export class AttendanceRepo {
     );
   }
   addReplyCheckin(chat: number, day: string, user: number, name: string, at: number): void {
-    // Upsert: a second check-in with a different name replaces the first one
-    // (so the user can correct their name during the day).
+    // Multiple check-ins per day allowed (one per class session).
+    // Table PK is (chat, day, user_id) so we can't have multiple rows…
+    // → the initSchema migration changes PK to (chat, day, user_id, at).
+    // Here we just INSERT; if the exact same timestamp collides, ignore.
     runSql(
       this.db,
       `INSERT INTO reply_checkins(chat,day,user_id,name,at) VALUES(?,?,?,?,?)
-       ON CONFLICT(chat,day,user_id) DO UPDATE SET name=excluded.name, at=excluded.at`,
+       ON CONFLICT DO NOTHING`,
       chat, day, user, name, at,
     );
   }

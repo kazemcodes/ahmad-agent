@@ -42,9 +42,73 @@ function fmtTimeOnly(ts) {
   return new Date(ts * 1000).toLocaleTimeString('fa-IR', { hour: '2-digit', minute: '2-digit' });
 }
 function fmtNum(n) { return (n || 0).toLocaleString('fa-IR'); }
+// Jalaali calendar conversion (algorithm from jalaali-js, MIT license).
+// Converts a Jalali date to Gregorian so the backend filter works.
+function jalaliToGregorian(jalali) {
+  try {
+    const parts = jalali.replace(/[./]/g, '/').split('/').map(Number);
+    if (parts.length !== 3 || parts.some(isNaN)) return null;
+    const [jy, jm, jd] = parts;
+    if (jm < 1 || jm > 12 || jd < 1 || jd > 31) return null;
+    const { gy, gm, gd } = jalaaliToGregorian(jy, jm, jd);
+    return `${gy}-${String(gm).padStart(2, '0')}-${String(gd).padStart(2, '0')}`;
+  } catch { return null; }
+}
+
+function div(a, b) { return Math.trunc(a / b); }
+function mod(a, b) { return a - div(a, b) * b; }
+function jalCal(jy) {
+  const bl = [31, 59, 90, 120, 151, 181, 212, 243, 273, 304, 334];
+  let gy = jy + 621, leapJ = -14, jp = 0, jm = 0, jump = 0;
+  if (jy >= 0) {
+    jump = div(jy, 33) * 8 + div(mod(jy, 33), 4);
+    jp = mod(jy, 33);
+  }
+  jump = mod(jump, 33);
+  if (jp > 3) jump += 1;
+  let leap = jump + 10 * div(jp, 4);
+  if (jp === 4) {
+    leap += 1;
+  } else if (jp === 3) {
+    leap -= 1;
+  }
+  leap = mod(leap, 33);
+  const jump2 = mod(jp, 4);
+  const leap2 = mod(leap, 4);
+  if (jump2 === 0) {
+    leap = leap2 * 4 - 1;
+  }
+  if (leap === -1) {
+    gy += 1;
+    leap = 3;
+  }
+  const march = 20 + leap - div(leap, 2);
+  return { gy, march };
+}
+function jalaaliToGregorian(jy, jm, jd) {
+  const r = jalCal(jy);
+  const gy = r.gy;
+  const marchDay = r.march;
+  let gy2 = gy, gm2, gd2;
+  // Day of year in Jalali
+  const bl = [31, 59, 90, 120, 151, 181, 212, 243, 273, 304, 334];
+  let dayOfYear = jd + (jm <= 7 ? (jm - 1) * 31 : bl[jm - 2] + 5 + 31 * (jm - 7));
+  // Convert Jalali day-of-year to Gregorian
+  const isLeap = ((gy % 4 === 0) && (gy % 100 !== 0)) || (gy % 400 === 0);
+  const gBl = [31, 59, 90, 120, 151, 181, 212, 243, 273, 304, 334];
+  if (dayOfYear < 79 + (isLeap ? 0 : 0)) {
+    // In Farvardin/Ordibehesht
+  }
+  // Simple: Jalali day 1 Farvardin = March marchDay of gy
+  const start = new Date(Date.UTC(gy, 2, marchDay));
+  const d = new Date(start.getTime() + (dayOfYear - 1) * 86400000);
+  return { gy: d.getUTCFullYear(), gm: d.getUTCMonth() + 1, gd: d.getUTCDate() };
+}
+
 function fmtDate(d) {
   if (!d) return '—';
-  return new Date(d + 'T00:00:00').toLocaleDateString('fa-IR', { year: 'numeric', month: '2-digit', day: '2-digit' });
+  // d is Gregorian YYYY-MM-DD from API; display as-is with Persian digits
+  return d.replace(/\d/g, c => '۰۱۲۳۴۵۶۷۸۹'[c]);
 }
 
 function el(tag, cls, text) {
@@ -143,12 +207,20 @@ $('backToGroups').addEventListener('click', () => {
 });
 
 $('applyFilter').addEventListener('click', () => {
-  const from = $('dateFrom').value;
-  const to = $('dateTo').value;
+  const fromRaw = $('dateFrom').value.trim();
+  const toRaw = $('dateTo').value.trim();
+  const from = fromRaw ? jalaliToGregorian(fromRaw) : null;
+  const to = toRaw ? jalaliToGregorian(toRaw) : null;
   let rows = ATTENDANCE;
   if (from) rows = rows.filter(r => r.day >= from);
   if (to) rows = rows.filter(r => r.day <= to);
   renderAttendance(rows);
+});
+
+$('clearFilter').addEventListener('click', () => {
+  $('dateFrom').value = '';
+  $('dateTo').value = '';
+  renderAttendance(ATTENDANCE);
 });
 
 // ── Export CSV ──

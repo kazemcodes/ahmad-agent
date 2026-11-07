@@ -7,6 +7,26 @@ import type { Db } from '../db.js';
 import type { Config } from '../config.js';
 import { nowSec } from '../logger.js';
 import { getLocalIp } from '../uptime.js';
+import moment from 'jalali-moment';
+
+/** Convert a Gregorian YYYY-MM-DD to a Jalali (Persian) date string, e.g. "۱۴۰۵/۸/۱۶". */
+function jalaliDate(gregorian: string | null): string | null {
+  if (!gregorian) return null;
+  try {
+    return moment(gregorian, 'YYYY-MM-DD').locale('fa').format('jYYYY/jMM/jDD');
+  } catch {
+    return null;
+  }
+}
+
+/** Convert a Jalali date string (YYYY-MM-DD in Jalali calendar) to Gregorian YYYY-MM-DD. */
+function gregorianFromJalali(jalali: string): string | null {
+  try {
+    return moment(jalali, 'jYYYY/jMM/jDD').locale('fa').format('YYYY-MM-DD');
+  } catch {
+    return null;
+  }
+}
 
 function hasTable(db: Db, table: string): boolean {
   const row = db.prepare("SELECT 1 AS x FROM sqlite_master WHERE type='table' AND name=?").get(table) as
@@ -65,6 +85,7 @@ export function createDashboardApp(db: Db, c: Config, dashboardDir: string, logF
           today_checkins: Number(r.today_checkins),
           total_checkins: Number(r.total_checkins),
           last_active: r.last_active,
+          last_active_jalali: jalaliDate(typeof r.last_active === 'string' ? r.last_active : null),
         }));
       res.json(groups);
     } catch (e) {
@@ -89,6 +110,7 @@ export function createDashboardApp(db: Db, c: Config, dashboardDir: string, logF
         .all(chat)
         .map((r: any) => ({
           day: r.day,
+          day_jalali: jalaliDate(typeof r.day === 'string' ? r.day : null),
           name: r.name,
           at: Number(r.at),
           user_id: Number(r.user_id),

@@ -134,9 +134,10 @@
           </div>
         </div>
         <div class="filter-row">
-          <label>از تاریخ: <input type="date" id="dateFrom"></label>
-          <label>تا تاریخ: <input type="date" id="dateTo"></label>
+          <label>از تاریخ (جلالی): <input type="text" id="dateFrom" placeholder="1405/08/01" inputmode="numeric" autocomplete="off"></label>
+          <label>تا تاریخ (جلالی): <input type="text" id="dateTo" placeholder="1405/08/16" inputmode="numeric" autocomplete="off"></label>
           <button class="btn-secondary" id="applyFilter">اعمال فیلتر</button>
+          <button class="btn-secondary" id="clearFilter">حذف فیلتر</button>
         </div>
         <div class="attendance-table-wrap">
           <table class="attendance-table" id="attendanceTable">
@@ -151,7 +152,7 @@
             </thead>
             <tbody id="attendanceTableBody"></tbody>
           </table>
-          <p id="attendanceEmpty" class="empty" hidden>برای این گروه 아직 حضوری ثبت نشده است.</p>
+          <p id="attendanceEmpty" class="empty" hidden>برای این گروه هنوز حضوری ثبت نشده است.</p>
         </div>
       </div>
     </section>

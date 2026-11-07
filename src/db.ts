@@ -45,7 +45,7 @@ export function initSchema(db: Db): void {
     CREATE TABLE IF NOT EXISTS messages(id INTEGER PRIMARY KEY, chat INTEGER, user_id INTEGER, name TEXT, text TEXT, at INTEGER);
     CREATE TABLE IF NOT EXISTS attendance(chat INTEGER, day TEXT, student INTEGER, at INTEGER, PRIMARY KEY(chat,day,student));
     CREATE TABLE IF NOT EXISTS session_attendance(chat INTEGER NOT NULL, day TEXT NOT NULL, schedule_id INTEGER NOT NULL, student INTEGER NOT NULL, at INTEGER NOT NULL, PRIMARY KEY(chat,day,schedule_id,student));
-    CREATE TABLE IF NOT EXISTS reply_checkins(chat INTEGER NOT NULL, day TEXT NOT NULL, user_id INTEGER NOT NULL, name TEXT NOT NULL, at INTEGER NOT NULL, PRIMARY KEY(chat,day,user_id));
+    CREATE TABLE IF NOT EXISTS reply_checkins(chat INTEGER NOT NULL, day TEXT NOT NULL, user_id INTEGER NOT NULL, name TEXT NOT NULL, at INTEGER NOT NULL, PRIMARY KEY(chat,day,user_id,at));
     CREATE TABLE IF NOT EXISTS schedules(id INTEGER PRIMARY KEY, chat INTEGER NOT NULL, weekday INTEGER NOT NULL, start TEXT NOT NULL, end TEXT NOT NULL, UNIQUE(chat,weekday,start,end));
     CREATE TABLE IF NOT EXISTS corrections(id INTEGER PRIMARY KEY, chat INTEGER, user_id INTEGER, requested TEXT, status TEXT DEFAULT 'pending');
   `);
@@ -95,4 +95,26 @@ export function initSchema(db: Db): void {
   db.exec(
     'CREATE TABLE IF NOT EXISTS spam_bans (chat INTEGER NOT NULL, user_id INTEGER NOT NULL, banned_at INTEGER NOT NULL, until INTEGER NOT NULL, PRIMARY KEY(chat,user_id))',
   );
+
+  // Migration: reply_checkins PK changed from (chat,day,user_id) to
+  // (chat,day,user_id,at) to allow multiple check-ins per day (one per session).
+  // Detect old schema by checking the SQL definition.
+  {
+    const row = db
+      .prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='reply_checkins'")
+      .get() as { sql: string } | undefined;
+    if (row && !row.sql.includes('at)')) {
+      // Old PK — migrate safely.
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS reply_checkins_new(
+          chat INTEGER NOT NULL, day TEXT NOT NULL, user_id INTEGER NOT NULL,
+          name TEXT NOT NULL, at INTEGER NOT NULL,
+          PRIMARY KEY(chat,day,user_id,at)
+        );
+        INSERT OR IGNORE INTO reply_checkins_new SELECT * FROM reply_checkins;
+        DROP TABLE reply_checkins;
+        ALTER TABLE reply_checkins_new RENAME TO reply_checkins;
+      `);
+    }
+  }
 }
