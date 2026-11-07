@@ -189,6 +189,49 @@ body { background: var(--bg); min-height: 100vh; }
 }
 .empty { padding: 36px 20px; text-align: center; color: var(--text-3); font-size: .9rem; }
 
+/* Groups */
+.groups-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 14px; }
+.group-card {
+  background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+  padding: 20px; display: flex; align-items: center; gap: 14px; cursor: pointer;
+  box-shadow: var(--shadow); transition: transform .18s, box-shadow .18s, border-color .18s;
+}
+.group-card:hover { transform: translateY(-2px); box-shadow: var(--shadow-lg); border-color: var(--primary); }
+.group-icon {
+  width: 48px; height: 48px; border-radius: 12px; flex-shrink: 0;
+  background: var(--primary-light); display: grid; place-items: center; font-size: 1.3rem;
+}
+.group-body { flex: 1; min-width: 0; }
+.group-title { display: block; font-size: .95rem; font-weight: 700; color: var(--text); }
+.group-meta { display: block; font-size: .82rem; color: var(--text-2); margin: 3px 0 2px; }
+.group-last { display: block; font-size: .78rem; color: var(--text-3); }
+.group-arrow { font-size: 1.2rem; color: var(--text-3); flex-shrink: 0; }
+
+/* Group detail */
+.group-detail { margin-top: 28px; }
+.filter-row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-bottom: 16px; }
+.filter-row label { font-size: .85rem; color: var(--text-2); display: flex; align-items: center; gap: 6px; }
+.filter-row input[type="date"] {
+  font: inherit; font-size: .85rem; padding: 7px 10px;
+  border: 1px solid var(--border-strong); border-radius: 8px; background: var(--surface);
+}
+.attendance-table-wrap {
+  background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+  overflow: hidden; box-shadow: var(--shadow); overflow-x: auto;
+}
+.attendance-table { width: 100%; border-collapse: collapse; }
+.attendance-table th {
+  background: var(--surface-2); color: var(--text-2); font-size: .82rem; font-weight: 700;
+  padding: 12px 16px; text-align: right; border-bottom: 2px solid var(--border);
+}
+.attendance-table td {
+  padding: 11px 16px; font-size: .9rem; border-bottom: 1px solid #f1f5f9;
+  font-variant-numeric: tabular-nums;
+}
+.attendance-table tr:last-child td { border-bottom: 0; }
+.attendance-table tr:hover td { background: var(--surface-2); }
+.td-name { font-weight: 600; color: var(--primary-dark); }
+
 /* Log viewer */
 .log-viewer {
   background: #0f172a; border-radius: var(--radius); overflow: hidden;

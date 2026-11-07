@@ -47,6 +47,60 @@ export function createDashboardApp(db: Db, c: Config, dashboardDir: string, logF
     return a.length === b.length && timingSafeEqual(a, b);
   };
 
+  app.get('/api/groups', (_req: Request, res: Response) => {
+    try {
+      const groups = db
+        .prepare(
+          `SELECT chat,
+                  COUNT(DISTINCT user_id) AS students,
+                  COUNT(CASE WHEN day = date('now','localtime') THEN 1 END) AS today_checkins,
+                  COUNT(*) AS total_checkins,
+                  MAX(day) AS last_active
+           FROM reply_checkins GROUP BY chat ORDER BY total_checkins DESC`,
+        )
+        .all()
+        .map((r: any) => ({
+          chat: Number(r.chat),
+          students: Number(r.students),
+          today_checkins: Number(r.today_checkins),
+          total_checkins: Number(r.total_checkins),
+          last_active: r.last_active,
+        }));
+      res.json(groups);
+    } catch (e) {
+      console.error(e);
+      res.status(500).json({ error: 'خطا در دریافت گروه‌ها' });
+    }
+  });
+
+  app.get('/api/attendance/:chat', (req: Request, res: Response) => {
+    try {
+      const chat = Number(req.params.chat);
+      const rows = db
+        .prepare(
+          `SELECT day, name, at, user_id,
+                  (SELECT COUNT(*) FROM messages m
+                   WHERE m.chat = r.chat AND m.user_id = r.user_id
+                     AND date(m.at, 'unixepoch', 'localtime') = r.day) AS msg_count
+           FROM reply_checkins r
+           WHERE chat = ?
+           ORDER BY day DESC, at`,
+        )
+        .all(chat)
+        .map((r: any) => ({
+          day: r.day,
+          name: r.name,
+          at: Number(r.at),
+          user_id: Number(r.user_id),
+          msg_count: Number(r.msg_count),
+        }));
+      res.json(rows);
+    } catch (e) {
+      console.error(e);
+      res.status(500).json({ error: 'خطا در دریافت حضور' });
+    }
+  });
+
   app.get('/api/data', (_req: Request, res: Response) => {
     try {
       if (!hasTable(db, 'messages')) {

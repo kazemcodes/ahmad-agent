@@ -23,8 +23,8 @@
       <button class="nav-btn active" data-tab="overview" aria-label="نمای کلی">
         <span class="nav-icon">🏠</span><span class="nav-label">نمای کلی</span>
       </button>
-      <button class="nav-btn" data-tab="attendance" aria-label="حضور امروز">
-        <span class="nav-icon">✅</span><span class="nav-label">حضور امروز</span>
+      <button class="nav-btn" data-tab="groups" aria-label="گروه‌ها">
+        <span class="nav-icon">👥</span><span class="nav-label">گروه‌ها</span>
       </button>
       <button class="nav-btn" data-tab="messages" aria-label="پیام‌های کلاس">
         <span class="nav-icon">💬</span><span class="nav-label">پیام‌های کلاس</span>
@@ -85,17 +85,17 @@
           </div>
         </div>
         <div class="stat-card">
-          <div class="stat-icon stat-icon--purple">📊</div>
+          <div class="stat-icon stat-icon--purple">👥</div>
           <div class="stat-info">
-            <span class="stat-label">کل حضورها</span>
-            <strong class="stat-value" id="statAttendance">—</strong>
+            <span class="stat-label">گروه‌های فعال</span>
+            <strong class="stat-value" id="statGroups">—</strong>
           </div>
         </div>
         <div class="stat-card">
-          <div class="stat-icon stat-icon--orange">🧠</div>
+          <div class="stat-icon stat-icon--orange">📊</div>
           <div class="stat-info">
-            <span class="stat-label">نوبت‌های گفتگو</span>
-            <strong class="stat-value" id="statMemory">—</strong>
+            <span class="stat-label">کل حضورها</span>
+            <strong class="stat-value" id="statAttendance">—</strong>
           </div>
         </div>
       </div>
@@ -110,18 +110,50 @@
       <div id="recentMessages" class="message-list"></div>
     </section>
 
-    <!-- Attendance -->
-    <section id="tab-attendance" class="tab">
+    <!-- Groups -->
+    <section id="tab-groups" class="tab">
       <div class="section-head">
         <div>
-          <h3>حضور امروز</h3>
-          <p id="attendanceSummary">دانش‌آموزانی که امروز حاضر شدند</p>
-        </div>
-        <div class="attendance-actions">
-          <button class="btn-secondary" id="exportBtn">📥 خروجی CSV</button>
+          <h3>گروه‌های کلاس</h3>
+          <p id="groupsSummary">روی هر گروه کلیک کن تا گزارش حضور رو ببینی</p>
         </div>
       </div>
-      <div id="attendanceList" class="attendance-list"></div>
+      <div id="groupsList" class="groups-grid"></div>
+
+      <!-- Group detail -->
+      <div id="groupDetail" class="group-detail" hidden>
+        <div class="section-head" style="margin-top:28px;">
+          <div>
+            <h3 id="groupDetailTitle">گزارش گروه</h3>
+            <p id="groupDetailSub"></p>
+          </div>
+          <div class="attendance-actions">
+            <button class="btn-secondary" id="exportPdfBtn">📄 خروجی PDF</button>
+            <button class="btn-secondary" id="exportCsvBtn">📥 خروجی CSV</button>
+            <button class="btn-secondary" id="backToGroups">← بازگشت</button>
+          </div>
+        </div>
+        <div class="filter-row">
+          <label>از تاریخ: <input type="date" id="dateFrom"></label>
+          <label>تا تاریخ: <input type="date" id="dateTo"></label>
+          <button class="btn-secondary" id="applyFilter">اعمال فیلتر</button>
+        </div>
+        <div class="attendance-table-wrap">
+          <table class="attendance-table" id="attendanceTable">
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>نام</th>
+                <th>تاریخ</th>
+                <th>ساعت حضور</th>
+                <th>پیام‌ها</th>
+              </tr>
+            </thead>
+            <tbody id="attendanceTableBody"></tbody>
+          </table>
+          <p id="attendanceEmpty" class="empty" hidden>برای این گروه 아직 حضوری ثبت نشده است.</p>
+        </div>
+      </div>
     </section>
 
     <!-- Messages -->
