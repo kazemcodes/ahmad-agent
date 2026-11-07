@@ -6,7 +6,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { config } from './config.js';
 import { initDb, initSchema } from './db.js';
-import { Logger, sleep } from './logger.js';
+import { Logger, sleep, nowSec } from './logger.js';
 import { Ahmad } from './ahmad.js';
 import { startDashboard } from './dashboard/server.js';
 
@@ -19,13 +19,31 @@ const logFile = path.join(projectRoot, 'data', 'bot.log');
 
 function acquireLock(): void {
   const lockPath = config.db + '.app.lock';
+  // Ensure the lock's directory exists (fresh deploy: no data/ yet).
+  try {
+    fs.mkdirSync(path.dirname(path.resolve(lockPath)), { recursive: true });
+  } catch {
+    /* ignore */
+  }
   try {
     fs.writeFileSync(lockPath, String(process.pid), { flag: 'wx' });
   } catch {
-    console.error(
-      `Another process is already running for this database. Stop the existing process before starting another one.`,
-    );
-    process.exit(1);
+    // A lock file exists. Check whether the pid in it is still alive.
+    // Stale locks (crashes, kill -9, container restarts) must not block startup.
+    if (lockIsStale(lockPath)) {
+      try {
+        fs.unlinkSync(lockPath);
+      } catch {
+        /* ignore */
+      }
+      try {
+        fs.writeFileSync(lockPath, String(process.pid), { flag: 'wx' });
+      } catch {
+        failLock();
+      }
+    } else {
+      failLock();
+    }
   }
   const release = () => {
     try {
@@ -43,6 +61,36 @@ function acquireLock(): void {
     release();
     process.exit(0);
   });
+}
+
+function failLock(): never {
+  console.error(
+    `Another process is already running for this database. Stop the existing process before starting another one.`,
+  );
+  process.exit(1);
+}
+
+function lockIsStale(lockPath: string): boolean {
+  let pid: number;
+  let stat: fs.Stats;
+  try {
+    pid = Number(fs.readFileSync(lockPath, 'utf8').trim());
+    stat = fs.statSync(lockPath);
+  } catch {
+    return true; // unreadable → treat as stale
+  }
+  if (!Number.isInteger(pid) || pid <= 0 || pid === process.pid) return true;
+  try {
+    process.kill(pid, 0); // alive?
+    // Pid is alive. Could be pid reuse (container restarted, pid recycled).
+    // Fall back to file age: a lock untouched for >5 minutes is stale.
+    const ageSeconds = nowSec() - Math.floor(stat.mtimeMs / 1000);
+    return ageSeconds > 300;
+  } catch (e) {
+    const code = (e as NodeJS.ErrnoException).code;
+    if (code === 'EPERM') return false; // exists but not signalable
+    return true; // ESRCH or anything else → stale
+  }
 }
 
 async function pollLoop(bot: Ahmad, logger: Logger): Promise<void> {

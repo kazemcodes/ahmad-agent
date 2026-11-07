@@ -2,7 +2,6 @@ import { extractCompletion } from '../aiCompletion.js';
 import { budgetHistory } from '../contextBudget.js';
 import { buildPrompt } from '../conversationPrompt.js';
 import type { ChatContext, Deps, UseCase } from '../context.js';
-import { buildRepositories } from '../repositories.js';
 import { cpLen, substr } from '../util.js';
 
 export const chatCmd: UseCase = async (ctx: ChatContext, deps: Deps) => {
@@ -32,8 +31,7 @@ export const chatCmd: UseCase = async (ctx: ChatContext, deps: Deps) => {
     return true;
   }
   try {
-    const studentRow = buildRepositories(deps.db).roster.findByUser(chat, user);
-    const studentName = studentRow?.name ?? name;
+    const studentName = name;
     const imageEnabled =
       deps.config.image_provider === 'gemini'
         ? !!(deps.config.gemini_image_key && deps.config.gemini_image_model)

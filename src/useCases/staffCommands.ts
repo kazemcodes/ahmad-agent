@@ -1,9 +1,9 @@
 import type { ChatContext, Deps, UseCase } from '../context.js';
 import { buildRepositories } from '../repositories.js';
-import { cpLen, hhmm, norm, substr, weekdayOf, ymd } from '../util.js';
+import { cpLen, hhmm, weekdayOf, ymd } from '../util.js';
 import { nowSec } from '../logger.js';
 
-const STAFF_RE = /^\/(class|schedule|schedules|today|unschedule|roster|report|sessions|rename|requests|approve|setnote|clearnote)(?:@\w+)?(?:\s+([\s\S]*))?$/u;
+const STAFF_RE = /^\/(report|class|schedule|schedules|today|unschedule|setnote|clearnote)(?:@\w+)?(?:\s+([\s\S]*))?$/u;
 
 export const staffCommands: UseCase = async (ctx: ChatContext, deps: Deps) => {
   const m = ctx.effectiveText.match(STAFF_RE);
@@ -64,9 +64,8 @@ export const staffCommands: UseCase = async (ctx: ChatContext, deps: Deps) => {
       await deps.send(chat, 'یادداشت حذف شد.', mid);
       return true;
     }
-    const linked = deps.db.prepare('SELECT 1 AS x FROM roster WHERE chat=? AND user_id=?').get(chat, student);
-    if (note === '' || cpLen(note) > 500 || !linked) {
-      await deps.send(chat, 'دانش‌آموز باید به فهرست متصل باشد و یادداشت حداکثر ۵۰۰ نویسه باشد.', mid);
+    if (note === '' || cpLen(note) > 500) {
+      await deps.send(chat, 'یادداشت باید حداکثر ۵۰۰ نویسه باشد.', mid);
       return true;
     }
     deps.memory.setNote(chat, student, note);
@@ -93,105 +92,19 @@ export const staffCommands: UseCase = async (ctx: ChatContext, deps: Deps) => {
     return true;
   }
 
-  if (cmd === 'sessions') {
-    const day = ymd(nowSec());
-    const windows = repos.classes.listTodayWithIds(chat, weekdayOf(nowSec()));
-    let out = 'حضور کلاس‌های امروز:\n';
-    for (const w of windows) {
-      out += '\n' + w.start + ' تا ' + w.end + '\n';
-      const rows = repos.attendance.sessionRows(chat, day, w.id);
-      for (const r of rows) out += r.name + ' — ' + (r.at ? hhmm(Number(r.at)) : 'نامشخص') + '\n';
-    }
-    await deps.send(chat, windows.length ? out : 'برای امروز برنامه هفتگی ثبت نشده است.', mid);
-    return true;
-  }
-
-  if (cmd === 'roster') {
-    const names: string[] = [];
-    for (const vRaw of arg.split(/[\r\n،,]+/u)) {
-      const v = norm(vRaw);
-      if (v !== '') names.push(v);
-    }
-    const n = repos.roster.addNames(chat, names);
-    await deps.send(chat, `نام‌ها دریافت شد: ${n}`, mid);
-    return true;
-  }
-
-  if (cmd === 'requests') {
-    const rows = repos.corrections.listPending(chat);
-    let out = 'درخواست‌های اصلاح نام:\n';
-    for (const r of rows) out += '#' + r.id + ' — ' + r.requested + ' (' + r.user_id + ')\n';
-    await deps.send(chat, rows.length ? out : 'درخواستی وجود ندارد.', mid);
-    return true;
-  }
-
-  if (cmd === 'approve') {
-    if (!/^\d+$/.test(arg)) {
-      await deps.send(chat, 'نمونه: /approve 1', mid);
-      return true;
-    }
-    const r = repos.corrections.getPending(Number(arg), chat);
-    if (!r) {
-      await deps.send(chat, 'درخواست پیدا نشد.', mid);
-      return true;
-    }
-    const old = repos.roster.findByUser(chat, r.user_id);
-    if (!old) {
-      await deps.send(chat, 'دانش‌آموز ابتدا باید به یک نام در فهرست متصل شود.', mid);
-      return true;
-    }
-    try {
-      repos.roster.renameById(old.id, r.requested);
-      repos.corrections.approve(r.id);
-      await deps.send(chat, 'اصلاح نام تأیید شد.', mid);
-    } catch {
-      await deps.send(chat, 'نام تکراری است یا قابل ثبت نیست.', mid);
-    }
-    return true;
-  }
-
-  if (cmd === 'rename') {
-    const p = arg.split('|', 2);
-    if (p.length !== 2) {
-      await deps.send(chat, 'نمونه: /rename نام قدیم | نام جدید', mid);
-      return true;
-    }
-    try {
-      const changes = repos.roster.rename(chat, norm(p[0]!), norm(p[1]!));
-      await deps.send(chat, changes ? 'نام اصلاح شد.' : 'نام پیدا نشد.', mid);
-    } catch {
-      await deps.send(chat, 'این نام تکراری است یا قابل ثبت نیست.', mid);
-    }
-    return true;
-  }
-
-  // /report (fallthrough)
-  const checkins = repos.attendance.listReplyToday(chat, ymd(nowSec()));
+  // /report
+  const day = ymd(nowSec());
+  const checkins = repos.attendance.listReplyToday(chat, day);
   if (checkins.length) {
-    let out = "📋 گزارش حضور امروز\n🗓 " + ymd(nowSec()) + "\n━━━━━━━━━━━━━━\n";
+    let out = "📋 گزارش حضور امروز\n🗓 " + day + "\n━━━━━━━━━━━━━━\n";
     checkins.forEach((entry, i) => {
-      out += `${i + 1}. ${entry.name}  ·  🕒 ${hhmm(Number(entry.at))}\n`;
+      const msgCount = Number(entry.msg_count ?? 0);
+      out += `${i + 1}. ${entry.name}  ·  🕒 ${hhmm(Number(entry.at))}  ·  💬 ${msgCount} پیام\n`;
     });
-    out += `━━━━━━━━━━━━━━\n👥 تعداد ثبت‌شده: ${checkins.length} نفر\nℹ️ این گزارش بر اساس پیام‌های حضور ثبت‌شده است.`;
+    out += `━━━━━━━━━━━━━━\n👥 تعداد ثبت‌شده: ${checkins.length} نفر\nℹ️ این گزارش بر اساس پیام‌های حضور امروز ثبت‌شده است.`;
     await deps.send(chat, out, mid);
     return true;
   }
-  const day = ymd(nowSec());
-  const rows = repos.attendance.dailyRows(chat, day);
-  if (!rows.length) {
-    await deps.send(chat, 'برای این گفتگو هنوز فهرست دانش‌آموزان ثبت نشده است. معلم ابتدا با /roster نام‌ها را ثبت کند و زمان کلاس را تنظیم کند.', mid);
-    return true;
-  }
-  let out = `گزارش ${day}\n`;
-  for (const r of rows) out += r.name + ' — ' + (r.at ? 'ثبت حضور ' + hhmm(Number(r.at)) : 'نامشخص') + '\n';
-  let windows: Array<{ start: string; end: string }> = repos.classes.listTodayWindows(chat, weekdayOf(nowSec())) as Array<{ start: string; end: string }>;
-  if (!repos.classes.hasWeekly(chat)) {
-    const legacy = repos.classes.getDaily(chat);
-    if (legacy) windows = [legacy];
-  }
-  const counts = repos.attendance.messageCountsInWindows(chat, windows, day);
-  out += "\nفعالیت در بازه کلاس (تعداد پیام):\n";
-  for (const r of counts) out += r.name + ': ' + r.n + '\n';
-  await deps.send(chat, out, mid);
+  await deps.send(chat, 'امروز هنوز هیچ حضوری ثبت نشده است.', mid);
   return true;
 };

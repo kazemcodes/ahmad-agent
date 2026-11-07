@@ -16,15 +16,12 @@ test('repositories round-trip against initSchema', () => {
   assert.equal(r.classes.listSchedules(1).length, 1);
   assert.equal(r.classes.isScheduleActiveNow(1, 6, '10:30'), true);
 
-  // roster + attendance
-  r.roster.addNames(1, ['ali', 'bob']);
-  assert.equal(r.roster.findByName(1, 'ali').length, 1);
-  const ali = r.roster.findByName(1, 'ali')[0]!;
-  r.roster.linkUser(ali.id, 42);
-  assert.equal(r.roster.findByUser(1, 42)!.id, ali.id);
-  r.attendance.addDaily(1, '2026-01-01', ali.id, 100);
-  assert.equal(r.attendance.hasDaily(1, '2026-01-01', ali.id), true);
-  assert.equal(r.attendance.dailyRows(1, '2026-01-01').length, 2);
+  // attendance (no roster — reply_checkins only)
+  r.attendance.addReplyCheckin(1, '2026-01-01', 42, 'ali', 100);
+  assert.equal(r.attendance.replyExisting(1, '2026-01-01', 42)?.name, 'ali');
+  assert.equal(r.attendance.listReplyToday(1, '2026-01-01').length, 1);
+  r.attendance.addDaily(1, '2026-01-01', 1, 100);
+  assert.equal(r.attendance.hasDaily(1, '2026-01-01', 1), true);
 
   // corrections
   r.corrections.add(1, 42, 'new name');

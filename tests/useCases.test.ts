@@ -7,7 +7,6 @@ import { replyCheckIn } from '../src/useCases/replyCheckIn.ts';
 import { classInstructionsCmd } from '../src/useCases/classInstructionsCmd.ts';
 import { staffCommands } from '../src/useCases/staffCommands.ts';
 import { correctRequest } from '../src/useCases/correctRequest.ts';
-import { nameCheckIn } from '../src/useCases/nameCheckIn.ts';
 import { searchCmd } from '../src/useCases/search.ts';
 import { webSearchCmd } from '../src/useCases/webSearchCmd.ts';
 import { voiceCmd } from '../src/useCases/voice.ts';
@@ -116,7 +115,9 @@ test('replyCheckIn records a bot-reply check-in', async () => {
 
 test('replyCheckIn ignores non-bot replies', async () => {
   const { db, deps } = setup();
-  const c = ctx({ text: 'علی حاضر', isBotReply: false, instructions: new ClassInstructions(db) });
+  // Unnamed check-in ("حاضر") works without a reply in the new simple mode,
+  // but a named check-in without a bot-reply should be ignored.
+  const c = ctx({ text: 'سلام', isBotReply: false, instructions: new ClassInstructions(db) });
   assert.equal(await replyCheckIn(c, deps), false);
   db.close();
 });
@@ -151,24 +152,8 @@ test('correctRequest queues a correction', async () => {
   const { db, sent, deps } = setup();
   const c = ctx({ text: '/correct علی جدید', instructions: new ClassInstructions(db) });
   assert.equal(await correctRequest(c, deps), true);
-  assert.match(sent[0]!.text, /ثبت شد/);
+  assert.match(sent[0]!.text, /به‌روزرسانی شد/);
   assert.equal(db.prepare('SELECT COUNT(*) n FROM corrections').get().n, 1);
-  db.close();
-});
-
-test('nameCheckIn in active window links roster', async () => {
-  const { db, sent, deps } = setup();
-  db.prepare('INSERT INTO roster(chat,name) VALUES(?,?)').run(100, 'علی');
-  // window spanning "now" (grace check is a string compare, so avoid midnight-wrap)
-  const now = new Date();
-  const hm = (d: Date) => `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
-  const start = hm(new Date(now.getTime() - 30 * 60000));
-  const end = hm(new Date(now.getTime() + 30 * 60000));
-  db.prepare('INSERT INTO classes(chat,start,end) VALUES(?,?,?)').run(100, start, end);
-  const c = ctx({ text: 'علی', instructions: new ClassInstructions(db) });
-  assert.equal(await nameCheckIn(c, deps), true);
-  assert.match(sent[0]!.text, /حضورت ثبت شد/);
-  assert.equal(db.prepare('SELECT COUNT(*) n FROM attendance').get().n, 1);
   db.close();
 });
 

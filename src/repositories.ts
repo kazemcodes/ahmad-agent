@@ -75,42 +75,6 @@ export class ClassesRepo {
   }
 }
 
-export class RosterRepo {
-  constructor(private db: Db) {}
-  findByName(chat: number, name: string): Row[] {
-    return queryAll(this.db, 'SELECT * FROM roster WHERE chat=? AND name=?', chat, name);
-  }
-  findByUser(chat: number, user: number): Row | undefined {
-    return queryOne(this.db, 'SELECT * FROM roster WHERE chat=? AND user_id=?', chat, user);
-  }
-  findOtherLinked(chat: number, user: number, exceptId: number): Row | undefined {
-    return queryOne(this.db, 'SELECT id FROM roster WHERE chat=? AND user_id=? AND id<>?', chat, user, exceptId);
-  }
-  listAll(chat: number): Row[] {
-    return queryAll(this.db, 'SELECT * FROM roster WHERE chat=?', chat);
-  }
-  addNames(chat: number, names: string[]): number {
-    let n = 0;
-    for (const name of names) {
-      runSql(this.db, 'INSERT OR IGNORE INTO roster(chat,name) VALUES(?,?)', chat, name);
-      n++;
-    }
-    return n;
-  }
-  linkUser(id: number, user: number): void {
-    runSql(this.db, 'UPDATE roster SET user_id=? WHERE id=?', user, id);
-  }
-  rename(chat: number, oldName: string, newName: string): number {
-    return runSql(this.db, 'UPDATE roster SET name=? WHERE chat=? AND name=?', newName, chat, oldName).changes;
-  }
-  renameById(id: number, newName: string): void {
-    runSql(this.db, 'UPDATE roster SET name=? WHERE id=?', newName, id);
-  }
-  listAllNames(chat: number): string[] {
-    return queryAll(this.db, 'SELECT name FROM roster WHERE chat=?', chat).map((r) => r.name);
-  }
-}
-
 export class AttendanceRepo {
   constructor(private db: Db) {}
   addDaily(chat: number, day: string, student: number, at: number): void {
@@ -151,7 +115,18 @@ export class AttendanceRepo {
     return queryOne(this.db, 'SELECT name,at FROM reply_checkins WHERE chat=? AND day=? AND user_id=?', chat, day, user);
   }
   listReplyToday(chat: number, day: string): Row[] {
-    return queryAll(this.db, 'SELECT name,at FROM reply_checkins WHERE chat=? AND day=? ORDER BY at,user_id', chat, day);
+    return queryAll(
+      this.db,
+      `SELECT name,at,user_id,
+              (SELECT COUNT(*) FROM messages m
+               WHERE m.chat = r.chat AND m.user_id = r.user_id
+                 AND date(m.at, 'unixepoch', 'localtime') = ?) AS msg_count
+       FROM reply_checkins r
+       WHERE chat=? AND day=? ORDER BY at,user_id`,
+      day,
+      chat,
+      day,
+    );
   }
   addReplyCheckin(chat: number, day: string, user: number, name: string, at: number): void {
     runSql(this.db, 'INSERT OR IGNORE INTO reply_checkins(chat,day,user_id,name,at) VALUES(?,?,?,?,?)', chat, day, user, name, at);
@@ -200,7 +175,6 @@ export class MessagesRepo {
 export interface Repositories {
   updates: UpdatesRepo;
   classes: ClassesRepo;
-  roster: RosterRepo;
   attendance: AttendanceRepo;
   corrections: CorrectionsRepo;
   messages: MessagesRepo;
@@ -210,7 +184,6 @@ export function buildRepositories(db: Db): Repositories {
   return {
     updates: new UpdatesRepo(db),
     classes: new ClassesRepo(db),
-    roster: new RosterRepo(db),
     attendance: new AttendanceRepo(db),
     corrections: new CorrectionsRepo(db),
     messages: new MessagesRepo(db),

@@ -7,7 +7,6 @@ import { replyCheckIn } from './useCases/replyCheckIn.js';
 import { classInstructionsCmd } from './useCases/classInstructionsCmd.js';
 import { staffCommands } from './useCases/staffCommands.js';
 import { correctRequest } from './useCases/correctRequest.js';
-import { nameCheckIn } from './useCases/nameCheckIn.js';
 import { searchCmd } from './useCases/search.js';
 import { webSearchCmd } from './useCases/webSearchCmd.js';
 import { voiceCmd } from './useCases/voice.js';
@@ -22,7 +21,6 @@ export const CHAIN: UseCase[] = [
   classInstructionsCmd,
   staffCommands,
   correctRequest,
-  nameCheckIn,
   searchCmd,
   webSearchCmd,
   voiceCmd,
