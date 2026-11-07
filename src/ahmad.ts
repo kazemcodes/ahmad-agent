@@ -160,6 +160,22 @@ export class Ahmad {
     if (intent !== null) {
       this.log('classroom.intent', { chat_id: chat, intent });
       effectiveText = intent;
+    } else if (addressed && text.trim() !== '' && !text.trim().startsWith('/')) {
+      // AI fallback — only for addressed, non-command messages that regex missed.
+      // Cost: one small AI call (~10 tokens) per unmatched addressed message.
+      try {
+        const { classifyIntent, intentToEffectiveText } = await import('./aiIntent.js');
+        const aiIntent = await classifyIntent(text, this.http, this.c);
+        if (aiIntent) {
+          const eff = intentToEffectiveText(aiIntent, text);
+          if (eff !== null) {
+            this.log('classroom.ai_intent', { chat_id: chat, intent: aiIntent });
+            effectiveText = eff;
+          }
+        }
+      } catch (e) {
+        this.log('classroom.ai_intent_failed', { error: e instanceof Error ? e.message : String(e) });
+      }
     }
 
     const ctx: ChatContext = {

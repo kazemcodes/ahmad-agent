@@ -62,7 +62,7 @@ export class Memory {
     return rows.reverse();
   }
 
-  relevant(chat: number, user: number, query: string, limit = 4): string[] {
+  relevant(chat: number, user: number, query: string, limit = 8): string[] {
     const rawTerms = query
       .toLowerCase()
       .split(/[^\p{L}\p{N}]+/u)
@@ -87,7 +87,7 @@ export class Memory {
       }
     }
     matches.sort((a, b) => b.score - a.score || b.id - a.id);
-    return matches.slice(0, Math.max(0, Math.min(limit, 4))).map((m) => m.content);
+    return matches.slice(0, Math.max(0, Math.min(limit, 8))).map((m) => m.content);
   }
 
   search(chat: number, user: number | null, term: string, limit = 10): SearchRow[] {

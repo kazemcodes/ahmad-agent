@@ -17,7 +17,7 @@ export function isForbidden(e: unknown): boolean {
 export class HttpClient {
   constructor(private logger: Logger) {}
 
-  async http(url: string, data: unknown, headers: Record<string, string> = {}, timeoutMs = 60000): Promise<any> {
+  async http(url: string, data: unknown, headers: Record<string, string> = {}, timeoutMs = 120000): Promise<any> {
     const service = url.includes('tapi.bale.ai') ? 'Bale' : 'AI provider';
     const path = safePath(url);
     const operation = service === 'Bale' ? path.split('/').pop() || path : path;

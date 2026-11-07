@@ -1,3 +1,171 @@
 <!doctype html>
-<html lang="fa" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>آقای ناظر | میز کلاس</title><link rel="stylesheet" href="style.css"></head>
-<body><div class="shell"><aside><div class="brand"><span class="mark">ا</span><div><strong>آقای ناظر</strong><small>دستیار کلاس</small></div></div><nav aria-label="بخش‌ها"><button class="nav active" data-tab="overview">نمای کلی</button><button class="nav" data-tab="messages">پیام‌های کلاس</button><button class="nav" data-tab="memory">حافظه گفتگو</button><button class="nav" data-tab="logs">گزارش اجرا</button><button class="nav" data-tab="admin">مدیریت</button></nav><p class="side-note">اطلاعات فقط روی همین رایانه نمایش داده می‌شود.</p></aside><main><header><div><span class="eyebrow">میز مدیریت کلاس</span><h1 id="title">نمای کلی</h1><p>کلاس‌ها، گفتگوها و وضعیت اجرا در یک نگاه</p></div><div class="header-actions"><span id="connection" class="status">در حال دریافت اطلاعات</span><button id="refresh" class="refresh">به‌روزرسانی</button></div></header><div id="error" role="alert" hidden></div><section id="overview" class="page active"><div class="intro"><div><span class="eyebrow">همراه کلاس شما</span><h2>سلام، به میز آقای ناظر خوش آمدید.</h2><p>گفتگوها و فعالیت کلاس را اینجا دنبال کنید.</p></div><span class="intro-mark" aria-hidden="true">ا</span></div><div class="stats"><article><span>پیام‌های دریافت‌شده</span><strong id="messagesCount">—</strong></article><article><span>دانش‌آموزان ثبت‌شده</span><strong id="rosterCount">—</strong></article><article><span>حضورهای ثبت‌شده</span><strong id="attendanceCount">—</strong></article><article><span>نوبت‌های گفتگو</span><strong id="memoryCount">—</strong></article></div><div class="section-head"><div><h2>آخرین پیام‌ها</h2><p>پیام‌های دریافتی از بله</p></div><button class="text-button" data-open="messages">مشاهده همه ←</button></div><div id="recent" class="list"></div></section><section id="messages" class="page"><div class="section-head"><div><h2>پیام‌های کلاس</h2><p>آخرین پیام‌های ذخیره‌شده</p></div></div><div id="messageList" class="list"></div></section><section id="memory" class="page"><div class="section-head"><div><h2>حافظه گفتگو</h2><p>آخرین نوبت‌های ذخیره‌شده برای هر دانش‌آموز</p></div></div><div id="memoryList" class="list"></div></section><section id="logs" class="page"><div class="section-head"><div><h2>گزارش اجرا</h2><p>آخرین رویدادها و خطاهای برنامه</p></div></div><pre id="logList" dir="ltr"></pre></section><section id="admin" class="page"><div class="section-head"><div><h2>مدیریت</h2><p>افزودن دانش‌آموز و زمان کلاس</p></div></div><label>شناسه گفتگو <input id="adminChat" type="number"></label><label>نام‌ها (هر خط یک نام) <textarea id="adminNames" rows="3"></textarea></label><button id="adminAddRoster">ثبت دانش‌آموز</button><hr><label>زمان هفتگی</label><div class="row"><label>روز <input id="adminWd" type="number" min="0" max="6"></label><label>شروع <input id="adminStart" type="time"></label><label>پایان <input id="adminEnd" type="time"></label></div><button id="adminAddSchedule">ثبت زمان</button><div id="adminList" class="list"></div></section><footer>آقای ناظر · پنل محلی</footer></main></div><script src="app.js"></script></body></html>
+<html lang="fa" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>آقای ناظر | میز کلاس</title>
+  <link rel="stylesheet" href="style.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@300;400;500;700;900&display=swap" rel="stylesheet">
+</head>
+<body>
+<div class="app">
+  <!-- Sidebar -->
+  <aside class="sidebar">
+    <div class="brand">
+      <div class="brand-icon">ا</div>
+      <div class="brand-text">
+        <strong>آقای ناظر</strong>
+        <span>دستیار کلاس</span>
+      </div>
+    </div>
+    <nav class="nav">
+      <button class="nav-btn active" data-tab="overview" aria-label="نمای کلی">
+        <span class="nav-icon">🏠</span><span class="nav-label">نمای کلی</span>
+      </button>
+      <button class="nav-btn" data-tab="attendance" aria-label="حضور امروز">
+        <span class="nav-icon">✅</span><span class="nav-label">حضور امروز</span>
+      </button>
+      <button class="nav-btn" data-tab="messages" aria-label="پیام‌های کلاس">
+        <span class="nav-icon">💬</span><span class="nav-label">پیام‌های کلاس</span>
+      </button>
+      <button class="nav-btn" data-tab="memory" aria-label="حافظه گفتگو">
+        <span class="nav-icon">🧠</span><span class="nav-label">حافظه گفتگو</span>
+      </button>
+      <button class="nav-btn" data-tab="logs" aria-label="گزارش اجرا">
+        <span class="nav-icon">📋</span><span class="nav-label">گزارش اجرا</span>
+      </button>
+    </nav>
+    <div class="sidebar-foot">
+      <div class="status-dot" id="connectionDot"></div>
+      <span id="connection" class="status-text">در حال اتصال…</span>
+    </div>
+  </aside>
+
+  <!-- Main -->
+  <main class="main">
+    <div class="topbar">
+      <div class="topbar-title">
+        <h1 id="pageTitle">نمای کلی</h1>
+        <p id="pageSub">کلاس‌ها، گفتگوها و وضعیت اجرا در یک نگاه</p>
+      </div>
+      <div class="topbar-actions">
+        <button id="refreshBtn" class="btn-refresh">
+          <span class="refresh-icon">↻</span> به‌روزرسانی
+        </button>
+      </div>
+    </div>
+
+    <div id="error" class="error-banner" hidden></div>
+
+    <!-- Overview -->
+    <section id="tab-overview" class="tab active">
+      <div class="hero">
+        <div class="hero-content">
+          <span class="hero-eyebrow">همراه کلاس شما</span>
+          <h2>سلام، به میز آقای ناظر خوش آمدید.</h2>
+          <p>گفتگوها و فعالیت کلاس را اینجا دنبال کنید. آمار لحظه‌ای به‌روز می‌شود.</p>
+        </div>
+        <div class="hero-mark">ا</div>
+      </div>
+
+      <div class="stat-grid">
+        <div class="stat-card">
+          <div class="stat-icon stat-icon--blue">💬</div>
+          <div class="stat-info">
+            <span class="stat-label">پیام‌های دریافت‌شده</span>
+            <strong class="stat-value" id="statMessages">—</strong>
+          </div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon stat-icon--green">✅</div>
+          <div class="stat-info">
+            <span class="stat-label">حضور امروز</span>
+            <strong class="stat-value" id="statToday">—</strong>
+          </div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon stat-icon--purple">📊</div>
+          <div class="stat-info">
+            <span class="stat-label">کل حضورها</span>
+            <strong class="stat-value" id="statAttendance">—</strong>
+          </div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon stat-icon--orange">🧠</div>
+          <div class="stat-info">
+            <span class="stat-label">نوبت‌های گفتگو</span>
+            <strong class="stat-value" id="statMemory">—</strong>
+          </div>
+        </div>
+      </div>
+
+      <div class="section-head">
+        <div>
+          <h3>آخرین پیام‌ها</h3>
+          <p>پیام‌های دریافتی از بله</p>
+        </div>
+        <button class="btn-ghost" data-goto="messages">مشاهده همه ←</button>
+      </div>
+      <div id="recentMessages" class="message-list"></div>
+    </section>
+
+    <!-- Attendance -->
+    <section id="tab-attendance" class="tab">
+      <div class="section-head">
+        <div>
+          <h3>حضور امروز</h3>
+          <p id="attendanceSummary">دانش‌آموزانی که امروز حاضر شدند</p>
+        </div>
+        <div class="attendance-actions">
+          <button class="btn-secondary" id="exportBtn">📥 خروجی CSV</button>
+        </div>
+      </div>
+      <div id="attendanceList" class="attendance-list"></div>
+    </section>
+
+    <!-- Messages -->
+    <section id="tab-messages" class="tab">
+      <div class="section-head">
+        <div>
+          <h3>پیام‌های کلاس</h3>
+          <p>آخرین پیام‌های ذخیره‌شده</p>
+        </div>
+      </div>
+      <div id="messageList" class="message-list"></div>
+    </section>
+
+    <!-- Memory -->
+    <section id="tab-memory" class="tab">
+      <div class="section-head">
+        <div>
+          <h3>حافظه گفتگو</h3>
+          <p>آخرین نوبت‌های ذخیره‌شده برای هر دانش‌آموز</p>
+        </div>
+      </div>
+      <div id="memoryList" class="message-list"></div>
+    </section>
+
+    <!-- Logs -->
+    <section id="tab-logs" class="tab">
+      <div class="section-head">
+        <div>
+          <h3>گزارش اجرا</h3>
+          <p>آخرین رویدادها و خطاهای برنامه</p>
+        </div>
+        <button class="btn-secondary" id="clearLogsBtn">پاک کردن گزارش</button>
+      </div>
+      <div class="log-viewer">
+        <pre id="logContent" dir="ltr"></pre>
+      </div>
+    </section>
+
+    <footer class="footer">
+      آقای ناظر · پنل محلی · <span id="footerTime"></span>
+    </footer>
+  </main>
+</div>
+
+<script src="app.js"></script>
+</body>
+</html>

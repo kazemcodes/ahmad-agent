@@ -26,6 +26,10 @@ export interface Config {
   ai_url: string;
   ai_key: string;
   ai_model: string;
+  ai_fallback_url: string;
+  ai_fallback_key: string;
+  ai_fallback_model: string;
+  ai_timeout_ms: number;
   vision_model: string;
   voice_model: string;
   voice_url: string;
@@ -77,6 +81,10 @@ export const config: Config = (() => {
     ai_url: aiBase,
     ai_key: env('AI_API_KEY'),
     ai_model: env('AI_MODEL'),
+    ai_fallback_url: trimSlash(env('AI_FALLBACK_BASE_URL')),
+    ai_fallback_key: env('AI_FALLBACK_API_KEY'),
+    ai_fallback_model: env('AI_FALLBACK_MODEL'),
+    ai_timeout_ms: num('AI_TIMEOUT_MS', 120000, 10000, 300000),
     vision_model: env('VISION_MODEL'),
     voice_model: env('VOICE_MODEL'),
     voice_url: trimSlash(env('VOICE_BASE_URL') || aiBase),
@@ -89,8 +97,8 @@ export const config: Config = (() => {
     image_url: imageUrl,
     image_key: imageKey,
     cloudflare_account: env('CLOUDFLARE_ACCOUNT_ID'),
-    history_turns: num('AI_HISTORY_TURNS', 6, 0, 30),
-    history_chars: num('AI_HISTORY_CHARS', 3000, 0, 30000),
+    history_turns: num('AI_HISTORY_TURNS', 12, 0, 30),
+    history_chars: num('AI_HISTORY_CHARS', 8000, 0, 30000),
     message_chars: num('AI_MESSAGE_CHARS', 4000, 100, 30000),
     max_output_tokens: num('AI_MAX_OUTPUT_TOKENS', 300, 0, Number.MAX_SAFE_INTEGER),
     chat_limit: num('CHAT_RATE_LIMIT', 10, 0, Number.MAX_SAFE_INTEGER),

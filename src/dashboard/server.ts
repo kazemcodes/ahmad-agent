@@ -64,13 +64,24 @@ export function createDashboardApp(db: Db, c: Config, dashboardDir: string, logF
         ? db.prepare('SELECT role,content,at,chat,user_id FROM conversation_turns ORDER BY id DESC LIMIT 60').all()
         : [];
       const stats: Record<string, number> = {};
-      for (const table of ['messages', 'roster', 'attendance', 'conversation_turns']) {
+      for (const table of ['messages', 'attendance', 'conversation_turns', 'reply_checkins']) {
         stats[table] = hasTable(db, table)
           ? Number((db.prepare(`SELECT COUNT(*) AS n FROM ${table}`).get() as { n: number }).n)
           : 0;
       }
-      const roster = hasTable(db, 'roster')
-        ? db.prepare('SELECT id,chat,name,user_id FROM roster ORDER BY chat,name LIMIT 200').all()
+      const roster: unknown[] = [];
+      const attendanceToday = hasTable(db, 'reply_checkins')
+        ? db
+            .prepare(
+              `SELECT name,at,user_id,
+                      (SELECT COUNT(*) FROM messages m
+                       WHERE m.chat = r.chat AND m.user_id = r.user_id
+                         AND date(m.at, 'unixepoch', 'localtime') = date('now', 'localtime')) AS msg_count
+               FROM reply_checkins r
+               WHERE date(at, 'unixepoch', 'localtime') = date('now', 'localtime')
+               ORDER BY at`,
+            )
+            .all()
         : [];
       const schedules = hasTable(db, 'schedules')
         ? db.prepare('SELECT id,chat,weekday,start,end FROM schedules ORDER BY chat,weekday,start LIMIT 200').all()
@@ -90,7 +101,7 @@ export function createDashboardApp(db: Db, c: Config, dashboardDir: string, logF
         fs.closeSync(fd);
         logs = buf.toString('utf8').trim().split('\n').slice(-80);
       }
-      res.json({ ready: true, messages, memory, stats, logs, roster, schedules, corrections });
+      res.json({ ready: true, messages, memory, stats, logs, roster, schedules, corrections, attendanceToday });
     } catch (e) {
       console.error(e);
       res.status(500).json({ error: 'خواندن اطلاعات ممکن نشد.' });
@@ -109,27 +120,6 @@ export function createDashboardApp(db: Db, c: Config, dashboardDir: string, logF
     }
     const chat = Number(req.body?.chat ?? 0);
     try {
-      if (action === 'add_roster' && chat) {
-        const names = String(req.body?.names ?? '').split(/[\r\n،,]+/u);
-        let n = 0;
-        const tx = db.transaction(() => {
-          for (const vRaw of names) {
-            const v = norm(vRaw);
-            if (v !== '') {
-              db.prepare('INSERT OR IGNORE INTO roster(chat,name) VALUES(?,?)').run(chat, v);
-              n++;
-            }
-          }
-        });
-        tx();
-        res.json({ ok: true, added: n });
-        return;
-      }
-      if (action === 'delete_roster' && chat) {
-        db.prepare('DELETE FROM roster WHERE chat=? AND id=?').run(chat, Number(req.body?.id ?? 0));
-        res.json({ ok: true });
-        return;
-      }
       if (action === 'add_schedule' && chat) {
         const wd = String(req.body?.weekday ?? '');
         const s = String(req.body?.start ?? '');
@@ -149,6 +139,11 @@ export function createDashboardApp(db: Db, c: Config, dashboardDir: string, logF
       }
       if (action === 'approve' && chat) {
         db.prepare("UPDATE corrections SET status='approved' WHERE chat=? AND id=? AND status='pending'").run(chat, Number(req.body?.id ?? 0));
+        res.json({ ok: true });
+        return;
+      }
+      if (action === 'clear_logs') {
+        try { fs.writeFileSync(logFile, ''); } catch { /* ignore */ }
         res.json({ ok: true });
         return;
       }
