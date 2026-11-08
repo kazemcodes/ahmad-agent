@@ -17,7 +17,8 @@ test('too short name rejected', () => {
 
 test('no حاضر = null', () => {
   assert.equal(checkInName('سلام'), null);
-  assert.equal(checkInName('حاضر'), 'حاضر');
+  assert.equal(checkInName('حاضر'), null);
+  assert.equal(checkInName('سلام عبدالواحد راوند'), null);
 });
 
 test('name with digits rejected', () => {
