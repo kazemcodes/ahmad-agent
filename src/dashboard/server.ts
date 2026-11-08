@@ -71,16 +71,20 @@ export function createDashboardApp(db: Db, c: Config, dashboardDir: string, logF
     try {
       const groups = db
         .prepare(
-          `SELECT chat,
-                  COUNT(DISTINCT user_id) AS students,
-                  COUNT(CASE WHEN day = date('now','localtime') THEN 1 END) AS today_checkins,
+          `SELECT r.chat,
+                  COUNT(DISTINCT r.user_id) AS students,
+                  COUNT(CASE WHEN r.day = date('now','localtime') THEN 1 END) AS today_checkins,
                   COUNT(*) AS total_checkins,
-                  MAX(day) AS last_active
-           FROM reply_checkins GROUP BY chat ORDER BY total_checkins DESC`,
+                  MAX(r.day) AS last_active,
+                  t.title AS title
+           FROM reply_checkins r
+           LEFT JOIN chat_titles t ON t.chat = r.chat
+           GROUP BY r.chat ORDER BY total_checkins DESC`,
         )
         .all()
         .map((r: any) => ({
           chat: Number(r.chat),
+          title: r.title ?? null,
           students: Number(r.students),
           today_checkins: Number(r.today_checkins),
           total_checkins: Number(r.total_checkins),

@@ -95,6 +95,10 @@ export function initSchema(db: Db): void {
   db.exec(
     'CREATE TABLE IF NOT EXISTS spam_bans (chat INTEGER NOT NULL, user_id INTEGER NOT NULL, banned_at INTEGER NOT NULL, until INTEGER NOT NULL, PRIMARY KEY(chat,user_id))',
   );
+  // Chat titles — cached from incoming messages (Bale sends chat.title for groups).
+  db.exec(
+    'CREATE TABLE IF NOT EXISTS chat_titles (chat INTEGER PRIMARY KEY, title TEXT NOT NULL, updated_at INTEGER NOT NULL)',
+  );
 
   // Migration: reply_checkins PK changed from (chat,day,user_id) to
   // (chat,day,user_id,at) to allow multiple check-ins per day (one per session).

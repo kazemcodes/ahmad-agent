@@ -145,7 +145,7 @@ function renderGroups() {
     card.addEventListener('click', () => openGroup(g.chat));
     const icon = el('div', 'group-icon', '👥');
     const body = el('div', 'group-body');
-    const title = el('strong', 'group-title', `گروه ${g.chat}`);
+    const title = el('strong', 'group-title', g.title || `گروه ${g.chat}`);
     const meta = el('p', 'group-meta',
       `${fmtNum(g.students)} دانش‌آموز · ${fmtNum(g.today_checkins)} حاضر امروز · ${fmtNum(g.total_checkins)} کل حضورها`
     );
@@ -161,8 +161,9 @@ function renderGroups() {
 
 async function openGroup(chatId) {
   CURRENT_GROUP = chatId;
+  const g = GROUPS.find(x => x.chat === chatId);
   $('groupDetail').hidden = false;
-  $('groupDetailTitle').textContent = `گزارش گروه ${chatId}`;
+  $('groupDetailTitle').textContent = g?.title || `گزارش گروه ${chatId}`;
   $('groupDetailSub').textContent = 'در حال بارگذاری…';
   document.getElementById('tab-groups').scrollIntoView({ behavior: 'smooth' });
   await loadAttendance();

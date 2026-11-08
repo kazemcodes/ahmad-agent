@@ -146,6 +146,14 @@ export class Ahmad {
     this.memory.observeUser(chat, m.from, at);
     this.db.prepare('INSERT INTO messages(chat,user_id,name,text,at) VALUES(?,?,?,?,?)').run(chat, user, name, text, at);
 
+    // Cache the group title (for the dashboard) whenever a message carries one.
+    const chatTitle = m.chat?.title;
+    if (chatTitle) {
+      this.db
+        .prepare('INSERT INTO chat_titles(chat,title,updated_at) VALUES(?,?,?) ON CONFLICT(chat) DO UPDATE SET title=excluded.title, updated_at=excluded.updated_at')
+        .run(chat, String(chatTitle), nowSec());
+    }
+
     // Banned users (spam) — silently ignore.
     {
       const { buildRepositories } = await import('./repositories.js');
