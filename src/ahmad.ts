@@ -42,9 +42,9 @@ export class Ahmad {
     this.logger.log(event, ctx);
   }
 
-  private async send(chat: number, text: string, reply?: number | null): Promise<void> {
+  private async send(chat: number, text: string, reply?: number | null, replyMarkup?: unknown): Promise<void> {
     try {
-      await this.bale.sendMessage(chat, text, reply ?? null);
+      await this.bale.sendMessage(chat, text, reply ?? null, replyMarkup);
     } catch (e) {
       // A 403 means the chat is unreachable (bot blocked, kicked, or chat gone).
       // Swallow it so the queue doesn't retry this update forever.
@@ -77,7 +77,7 @@ export class Ahmad {
       config: this.c,
       db: this.db,
       log: (event, ctx) => this.log(event, ctx),
-      send: (chat, text, reply) => this.send(chat, text, reply),
+      send: (chat, text, reply, replyMarkup) => this.send(chat, text, reply, replyMarkup),
       typing: (chat, action) => this.typing(chat, action ?? 'upload_photo'),
       staff: (user) => this.staff(user),
       bale: this.bale,
@@ -92,7 +92,19 @@ export class Ahmad {
     const data: string = cb.data ?? '';
     const chat = Number(cb.message?.chat?.id ?? 0);
     const user = Number(cb.from?.id ?? 0);
+    const chatType: string = cb.message?.chat?.type ?? '';
     const mid: number | null = cb.message?.message_id ?? null;
+
+    if (chatType === 'private') {
+      this.log('callback.private_ignored', { chat_id: chat, user_id: user });
+      try {
+        await this.bale.answerCallbackQuery(cb.id ?? '', 'از دکمه‌های منوی پایین استفاده کنید.');
+      } catch {
+        /* ignore */
+      }
+      return;
+    }
+
     this.log('callback.received', { data });
     if (data.startsWith('present:') && chat > 0) {
       const name = data.slice(8).trim();
@@ -131,7 +143,10 @@ export class Ahmad {
     const text = String(m.text ?? m.caption ?? '').trim();
     const mid: number | null = m.message_id ?? null;
     const at = Number(m.date ?? nowSec());
-    if (u.edited_message) {
+    const chatType = String(m.chat.type ?? 'unknown');
+    const isPrivate = chatType === 'private';
+
+    if (u.edited_message && !isPrivate) {
       this.db.prepare('UPDATE messages SET text=? WHERE chat=? AND user_id=? AND text=? ORDER BY id DESC LIMIT 1').run(text, chat, user, text);
       this.log('message.edited', { chat_id: chat });
     }
@@ -141,40 +156,43 @@ export class Ahmad {
       user_id: user,
       message_id: mid,
       text_length: cpLen(text),
-      chat_type: m.chat.type ?? 'unknown',
+      chat_type: chatType,
     });
-    this.memory.observeUser(chat, m.from, at);
-    this.db.prepare('INSERT INTO messages(chat,user_id,name,text,at) VALUES(?,?,?,?,?)').run(chat, user, name, text, at);
 
-    // Cache the group title (for the dashboard) whenever a message carries one.
-    const chatTitle = m.chat?.title;
-    if (chatTitle) {
-      this.db
-        .prepare('INSERT INTO chat_titles(chat,title,updated_at) VALUES(?,?,?) ON CONFLICT(chat) DO UPDATE SET title=excluded.title, updated_at=excluded.updated_at')
-        .run(chat, String(chatTitle), nowSec());
-    }
+    if (!isPrivate) {
+      this.memory.observeUser(chat, m.from, at);
+      this.db.prepare('INSERT INTO messages(chat,user_id,name,text,at) VALUES(?,?,?,?,?)').run(chat, user, name, text, at);
 
-    // Banned users (spam) — silently ignore.
-    {
-      const { buildRepositories } = await import('./repositories.js');
-      const until = buildRepositories(this.db).updates.bannedUntil(chat, user, nowSec());
-      if (until !== null) {
-        this.log('message.banned', { chat_id: chat, user_id: user, until });
-        return;
+      // Cache the group title (for the dashboard) whenever a message carries one.
+      const chatTitle = m.chat?.title;
+      if (chatTitle) {
+        this.db
+          .prepare('INSERT INTO chat_titles(chat,title,updated_at) VALUES(?,?,?) ON CONFLICT(chat) DO UPDATE SET title=excluded.title, updated_at=excluded.updated_at')
+          .run(chat, String(chatTitle), nowSec());
       }
-    }
 
-    // Anti-spam: ≥5 identical messages within 60s → ban for 1 year.
-    if (text !== '') {
-      const dupes = this.db
-        .prepare('SELECT COUNT(*) AS n FROM messages WHERE chat=? AND user_id=? AND text=? AND at > ?')
-        .get(chat, user, text, at - 60) as { n: number };
-      if (Number(dupes.n) >= 5) {
+      // Banned users (spam) — silently ignore.
+      {
         const { buildRepositories } = await import('./repositories.js');
-        buildRepositories(this.db).updates.banUser(chat, user, nowSec());
-        this.log('message.spam_ban', { chat_id: chat, user_id: user, dupes: Number(dupes.n) });
-        await this.send(chat, '🚫 پیام‌های مکرر ارسال شد. شما برای نیم ساعت محدود شده‌اید.', mid);
-        return;
+        const until = buildRepositories(this.db).updates.bannedUntil(chat, user, nowSec());
+        if (until !== null) {
+          this.log('message.banned', { chat_id: chat, user_id: user, until });
+          return;
+        }
+      }
+
+      // Anti-spam: ≥5 identical messages within 60s → ban for 1 year.
+      if (text !== '') {
+        const dupes = this.db
+          .prepare('SELECT COUNT(*) AS n FROM messages WHERE chat=? AND user_id=? AND text=? AND at > ?')
+          .get(chat, user, text, at - 60) as { n: number };
+        if (Number(dupes.n) >= 5) {
+          const { buildRepositories } = await import('./repositories.js');
+          buildRepositories(this.db).updates.banUser(chat, user, nowSec());
+          this.log('message.spam_ban', { chat_id: chat, user_id: user, dupes: Number(dupes.n) });
+          await this.send(chat, '🚫 پیام‌های مکرر ارسال شد. شما برای نیم ساعت محدود شده‌اید.', mid);
+          return;
+        }
       }
     }
 
@@ -190,30 +208,32 @@ export class Ahmad {
       text.includes('آقای ناظر') ||
       (!!this.c.bot_username && text.toLowerCase().includes('@' + this.c.bot_username.toLowerCase())) ||
       (!!this.c.bot_username && replyUsername.toLowerCase() === this.c.bot_username.toLowerCase()) ||
-      (m.chat.type ?? '') === 'private';
+      isPrivate;
     const isBotReply =
       !!this.c.bot_username && replyUsername.toLowerCase() === this.c.bot_username.toLowerCase();
 
     let effectiveText = text;
-    const intent = classroomIntent(text, addressed || this.staff(user));
-    if (intent !== null) {
-      this.log('classroom.intent', { chat_id: chat, intent });
-      effectiveText = intent;
-    } else if (addressed && text.trim() !== '' && !text.trim().startsWith('/')) {
-      // AI fallback — only for addressed, non-command messages that regex missed.
-      // Cost: one small AI call (~10 tokens) per unmatched addressed message.
-      try {
-        const { classifyIntent, intentToEffectiveText } = await import('./aiIntent.js');
-        const aiIntent = await classifyIntent(text, this.http, this.c);
-        if (aiIntent) {
-          const eff = intentToEffectiveText(aiIntent, text);
-          if (eff !== null) {
-            this.log('classroom.ai_intent', { chat_id: chat, intent: aiIntent });
-            effectiveText = eff;
+    if (!isPrivate) {
+      const intent = classroomIntent(text, addressed || this.staff(user));
+      if (intent !== null) {
+        this.log('classroom.intent', { chat_id: chat, intent });
+        effectiveText = intent;
+      } else if (addressed && text.trim() !== '' && !text.trim().startsWith('/')) {
+        // AI fallback — only for addressed, non-command group messages that regex missed.
+        // Cost: one small AI call (~10 tokens) per unmatched addressed message.
+        try {
+          const { classifyIntent, intentToEffectiveText } = await import('./aiIntent.js');
+          const aiIntent = await classifyIntent(text, this.http, this.c);
+          if (aiIntent) {
+            const eff = intentToEffectiveText(aiIntent, text);
+            if (eff !== null) {
+              this.log('classroom.ai_intent', { chat_id: chat, intent: aiIntent });
+              effectiveText = eff;
+            }
           }
+        } catch (e) {
+          this.log('classroom.ai_intent_failed', { error: e instanceof Error ? e.message : String(e) });
         }
-      } catch (e) {
-        this.log('classroom.ai_intent_failed', { error: e instanceof Error ? e.message : String(e) });
       }
     }
 

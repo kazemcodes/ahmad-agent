@@ -55,6 +55,9 @@ export interface Config {
   poll_inline_images: boolean;
   image_workers: number;
   port: number;
+  myclass_api_url: string;
+  myclass_bot_token: string;
+  myclass_timeout_ms: number;
 }
 
 export const config: Config = (() => {
@@ -110,6 +113,9 @@ export const config: Config = (() => {
     poll_inline_images: env('POLL_INLINE_IMAGES') === '1',
     image_workers: num('IMAGE_WORKERS', 2, 1, 16),
     port: num('PORT', num('SERVER_PORT', 3000, 1, 65535), 1, 65535),
+    myclass_api_url: trimSlash(env('MYCLASS_API_URL')),
+    myclass_bot_token: env('MYCLASS_BOT_TOKEN'),
+    myclass_timeout_ms: num('MYCLASS_TIMEOUT_MS', 90000, 5000, 180000),
   };
   return Object.freeze(c);
 })();

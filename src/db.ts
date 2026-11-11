@@ -100,6 +100,40 @@ export function initSchema(db: Db): void {
     'CREATE TABLE IF NOT EXISTS chat_titles (chat INTEGER PRIMARY KEY, title TEXT NOT NULL, updated_at INTEGER NOT NULL)',
   );
 
+  // Private-chat student portal tables (never mixed with group messages/reply_checkins).
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS bale_student_links (
+      user_id INTEGER PRIMARY KEY,
+      national_code TEXT NOT NULL,
+      student_id INTEGER NOT NULL,
+      full_name TEXT NOT NULL,
+      teacher_name TEXT,
+      school_name TEXT,
+      class_name TEXT,
+      linked_at INTEGER NOT NULL,
+      updated_at INTEGER NOT NULL
+    );
+    CREATE TABLE IF NOT EXISTS pv_states (
+      user_id INTEGER PRIMARY KEY,
+      state TEXT NOT NULL,
+      payload TEXT,
+      updated_at INTEGER NOT NULL
+    );
+    CREATE TABLE IF NOT EXISTS pv_attendance_logs (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER NOT NULL,
+      student_id INTEGER NOT NULL,
+      national_code TEXT NOT NULL,
+      date TEXT NOT NULL,
+      period_number INTEGER NOT NULL,
+      period_title TEXT,
+      status TEXT NOT NULL,
+      synced_at INTEGER NOT NULL,
+      UNIQUE(user_id, student_id, date, period_number)
+    );
+    CREATE INDEX IF NOT EXISTS pv_attendance_lookup ON pv_attendance_logs(user_id, date);
+  `);
+
   // Migration: reply_checkins PK changed from (chat,day,user_id) to
   // (chat,day,user_id,at) to allow multiple check-ins per day (one per session).
   // Detect old schema by checking the SQL definition.

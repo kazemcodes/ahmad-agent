@@ -11,9 +11,10 @@ export class BaleClient {
     return this.http.http(`https://tapi.bale.ai/bot${this.token}/${method}`, data);
   }
 
-  sendMessage(chat: number, text: string, replyTo?: number | null): Promise<any> {
+  sendMessage(chat: number, text: string, replyTo?: number | null, replyMarkup?: unknown): Promise<any> {
     const d: Record<string, unknown> = { chat_id: chat, text };
     if (replyTo) d.reply_to_message_id = replyTo;
+    if (replyMarkup !== undefined && replyMarkup !== null) d.reply_markup = replyMarkup;
     return this.api('sendMessage', d);
   }
 
