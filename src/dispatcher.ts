@@ -2,6 +2,7 @@
 // overlapping triggers make order load-bearing. Each use case returns true
 // when it handled the message; the first true wins.
 import type { ChatContext, Deps, UseCase } from './context.js';
+import { privateMyClass } from './useCases/privateMyClass.js';
 import { startHelp } from './useCases/start.js';
 import { replyCheckIn } from './useCases/replyCheckIn.js';
 import { classInstructionsCmd } from './useCases/classInstructionsCmd.js';
@@ -17,6 +18,7 @@ import { imageRequest } from './useCases/imageRequest.js';
 import { chatCmd } from './useCases/chat.js';
 
 export const CHAIN: UseCase[] = [
+  privateMyClass,
   startHelp,
   replyCheckIn,
   classInstructionsCmd,

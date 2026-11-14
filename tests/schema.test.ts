@@ -45,6 +45,12 @@ const STATEMENTS: Array<{ name: string; sql: string; params?: unknown[] }> = [
   { name: 'dashboard messages', sql: 'SELECT m.name,m.text,m.at,m.chat,m.user_id,u.username FROM messages m LEFT JOIN observed_users u ON u.chat=m.chat AND u.user_id=m.user_id ORDER BY m.id DESC LIMIT 60' },
   { name: 'report join attendance', sql: 'SELECT r.name,a.at FROM roster r LEFT JOIN attendance a ON a.student=r.id AND a.chat=r.chat AND a.day=? WHERE r.chat=? ORDER BY r.name', params: ['2026-01-01', 1] },
   { name: 'report join session', sql: 'SELECT r.name,a.at FROM roster r LEFT JOIN session_attendance a ON a.student=r.id AND a.chat=r.chat AND a.day=? AND a.schedule_id=? WHERE r.chat=? ORDER BY r.name', params: ['2026-01-01', 1, 1] },
+  { name: 'pv link upsert', sql: 'INSERT INTO bale_student_links(user_id,national_code,student_id,full_name,teacher_name,school_name,class_name,linked_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?) ON CONFLICT(user_id) DO UPDATE SET national_code=excluded.national_code,student_id=excluded.student_id,full_name=excluded.full_name,teacher_name=excluded.teacher_name,school_name=excluded.school_name,class_name=excluded.class_name,updated_at=excluded.updated_at', params: [10, '0012345678', 1, 'Ali', 'Prof', 'High', '10A', 100, 100] },
+  { name: 'pv link get', sql: 'SELECT * FROM bale_student_links WHERE user_id=?', params: [10] },
+  { name: 'pv state upsert', sql: 'INSERT INTO pv_states(user_id,state,payload,updated_at) VALUES(?,?,?,?) ON CONFLICT(user_id) DO UPDATE SET state=excluded.state,payload=excluded.payload,updated_at=excluded.updated_at', params: [10, 'menu', null, 100] },
+  { name: 'pv state get', sql: 'SELECT user_id,state,payload,updated_at FROM pv_states WHERE user_id=?', params: [10] },
+  { name: 'pv attendance upsert', sql: 'INSERT INTO pv_attendance_logs(user_id,student_id,national_code,date,period_number,period_title,status,synced_at) VALUES(?,?,?,?,?,?,?,?) ON CONFLICT(user_id,student_id,date,period_number) DO UPDATE SET period_title=excluded.period_title,status=excluded.status,synced_at=excluded.synced_at', params: [10, 1, '0012345678', '2026-10-12', 1, 'زنگ اول', 'present', 100] },
+  { name: 'pv attendance list', sql: 'SELECT * FROM pv_attendance_logs WHERE user_id=? AND date=? ORDER BY period_number', params: [10, '2026-10-12'] },
 ];
 
 test('every SQL statement prepares against initSchema()', () => {
@@ -78,5 +84,8 @@ test('table columns pinned (PRAGMA table_info)', () => {
   assert.deepEqual(cols('attendance'), ['chat', 'day', 'student', 'at']);
   assert.deepEqual(cols('session_attendance'), ['chat', 'day', 'schedule_id', 'student', 'at']);
   assert.deepEqual(cols('roster'), ['id', 'chat', 'name', 'user_id']);
+  assert.deepEqual(cols('bale_student_links'), ['user_id', 'national_code', 'student_id', 'full_name', 'teacher_name', 'school_name', 'class_name', 'linked_at', 'updated_at']);
+  assert.deepEqual(cols('pv_states'), ['user_id', 'state', 'payload', 'updated_at']);
+  assert.deepEqual(cols('pv_attendance_logs'), ['id', 'user_id', 'student_id', 'national_code', 'date', 'period_number', 'period_title', 'status', 'synced_at']);
   db.close();
 });

@@ -7,13 +7,6 @@ import { initDb, initSchema } from '../src/db.ts';
 import { config } from '../src/config.ts';
 import { Ahmad } from '../src/ahmad.ts';
 
-// Characterization tests: snapshot the *current* handle() behavior so the
-// use-case refactor (PR5) can prove 1:1 parity. `send()` failures against the
-// invalid Bale token must not propagate — `typing()` already swallows them,
-// and the send callers sit inside handlers that tolerate it. To make the
-// tests hermetic we pre-seed the dedupe table so a second identical update
-// short-circuits AFTER the first run inserts the message row; then we assert
-// the message row exists (handle reached the DB write) for each flow.
 function tmpDb() {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'ahmad-disp-'));
   const p = path.join(dir, 'test.sqlite');
@@ -44,50 +37,112 @@ function cfg() {
     cloudflare_account: '',
     gemini_image_key: '',
     gemini_image_model: '',
+    myclass_api_url: '',
+    myclass_bot_token: '',
+    myclass_timeout_ms: 90000,
   };
 }
 
-function msg(text: string, fromId = 99, chatType = 'private') {
+function msg(text: string, fromId = 99, chatType = 'group', chatId = -1001, extra: Record<string, unknown> = {}) {
   return {
     update_id: 1,
     message: {
       message_id: 10,
-      from: { id: fromId, first_name: 'a', username: 'u' },
-      chat: { id: 1, type: chatType },
+      from: { id: fromId, first_name: 'Ali', username: 'ali_u' },
+      chat: { id: chatId, type: chatType, title: chatType === 'group' ? 'گروه دهم' : undefined },
       date: Math.floor(Date.now() / 1000),
       text,
+      ...extra,
     },
   } as any;
 }
 
-test('/start reaches the message-row insert', async () => {
+test('group /start reaches the message-row insert', async () => {
   const { db, dir } = tmpDb();
   const bot = new Ahmad(cfg(), db);
-  // First run: send() throws Bale 404 AFTER the insert — handle() swallows
-  // nothing around send(), so we catch here; row must still exist.
-  await bot.handle(msg('/start')).catch(() => {});
-  const row = db.prepare('SELECT text FROM messages WHERE chat=1').get() as any;
+  await bot.handle(msg('/start', 99, 'group', -1001)).catch(() => {});
+  const row = db.prepare('SELECT text FROM messages WHERE chat=-1001').get() as any;
   assert.equal(row.text, '/start');
   db.close();
   fs.rmSync(dir, { recursive: true, force: true });
 });
 
-test('non-staff staff command reaches the message-row insert', async () => {
+test('group non-staff staff command reaches the message-row insert', async () => {
   const { db, dir } = tmpDb();
   const bot = new Ahmad(cfg(), db);
-  await bot.handle(msg('/class 08:00 09:30', 5)).catch(() => {});
-  const rows = db.prepare('SELECT text FROM messages WHERE chat=1').all() as any[];
+  await bot.handle(msg('/class 08:00 09:30', 5, 'group', -1001)).catch(() => {});
+  const rows = db.prepare('SELECT text FROM messages WHERE chat=-1001').all() as any[];
   assert.ok(rows.some((r) => r.text === '/class 08:00 09:30'));
   db.close();
   fs.rmSync(dir, { recursive: true, force: true });
 });
 
-test('unknown private text reaches the message-row insert', async () => {
+test('group arbitrary text reaches the message-row insert', async () => {
   const { db, dir } = tmpDb();
   const bot = new Ahmad(cfg(), db);
-  await bot.handle(msg('سلام', 5)).catch(() => {});
-  const rows = db.prepare('SELECT text FROM messages WHERE chat=1').all() as any[];
+  await bot.handle(msg('سلام', 5, 'group', -1001)).catch(() => {});
+  const rows = db.prepare('SELECT text FROM messages WHERE chat=-1001').all() as any[];
   assert.ok(rows.some((r) => r.text === 'سلام'));
+  db.close();
+  fs.rmSync(dir, { recursive: true, force: true });
+});
+
+test('private chat writes zero rows to messages, conversation_turns, observed_users, or reply_checkins and skips AI', async () => {
+  const { db, dir } = tmpDb();
+  const c = {
+    ...cfg(),
+    ai_url: 'http://127.0.0.1:9',
+    ai_key: 'sk-test',
+    ai_model: 'gpt-test',
+  };
+  const bot = new Ahmad(c, db);
+
+  // Stub network calls so even AI / Bale calls never hit real network and fail loudly if AI were called
+  let aiCalled = false;
+  (bot as any).http = {
+    http: async (url: string) => {
+      if (url.includes('/chat/completions')) {
+        aiCalled = true;
+      }
+      return { ok: true, result: {} };
+    },
+  };
+  (bot as any).bale = {
+    sendMessage: async () => ({ ok: true }),
+    sendChatAction: async () => ({ ok: true }),
+    answerCallbackQuery: async () => ({ ok: true }),
+    getFile: async () => ({ ok: true, result: { file_path: '' } }),
+  };
+
+  await bot.handle(msg('/start', 500, 'private', 500));
+  await bot.handle({ ...msg('سلام هوش مصنوعی حالت چطوره؟', 500, 'private', 500), update_id: 2 });
+  await bot.handle({
+    update_id: 3,
+    edited_message: {
+      message_id: 11,
+      from: { id: 500, first_name: 'Ali', username: 'ali_u' },
+      chat: { id: 500, type: 'private' },
+      date: Math.floor(Date.now() / 1000),
+      text: '۰۹۱۲۳۴۵۶۷۸ ویرایش',
+    },
+  } as any);
+  await bot.handle({
+    update_id: 4,
+    callback_query: {
+      id: 'cb-1',
+      data: 'present:علی',
+      from: { id: 500, first_name: 'Ali' },
+      message: { message_id: 12, chat: { id: 500, type: 'private' } },
+    },
+  } as any);
+
+  assert.equal(aiCalled, false);
+  assert.equal((db.prepare('SELECT COUNT(*) AS n FROM messages').get() as any).n, 0);
+  assert.equal((db.prepare('SELECT COUNT(*) AS n FROM conversation_turns').get() as any).n, 0);
+  assert.equal((db.prepare('SELECT COUNT(*) AS n FROM observed_users').get() as any).n, 0);
+  assert.equal((db.prepare('SELECT COUNT(*) AS n FROM reply_checkins').get() as any).n, 0);
+  assert.equal((db.prepare('SELECT COUNT(*) AS n FROM spam_bans').get() as any).n, 0);
+
   db.close();
   fs.rmSync(dir, { recursive: true, force: true });
 });

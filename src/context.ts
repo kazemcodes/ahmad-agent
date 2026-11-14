@@ -29,7 +29,7 @@ export interface Deps {
   config: Config;
   db: Db;
   log: (event: string, ctx?: Record<string, unknown>) => void;
-  send: (chat: number, text: string, reply?: number | null) => Promise<void>;
+  send: (chat: number, text: string, reply?: number | null, replyMarkup?: unknown) => Promise<void>;
   typing: (chat: number, action?: string) => Promise<void>;
   staff: (user: number) => boolean;
   bale: BaleClient;

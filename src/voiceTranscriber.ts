@@ -2,12 +2,7 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-
-function validatePath(p: string): void {
-  if (p === '' || p.includes('..') || p.startsWith('/') || !/^[A-Za-z0-9_./-]+$/.test(p)) {
-    throw new Error('Invalid Bale file path');
-  }
-}
+import { validateBaleFilePath } from './baleImageReader.js';
 
 export class VoiceTranscriber {
   constructor(
@@ -18,7 +13,7 @@ export class VoiceTranscriber {
   ) {}
 
   async transcribe(filePath: string): Promise<string> {
-    validatePath(filePath);
+    validateBaleFilePath(filePath);
     const url = `https://tapi.bale.ai/file/bot${this.token}/${filePath}`;
     const res = await fetch(url, { signal: AbortSignal.timeout(60000) });
     if (res.status !== 200) throw new Error('Voice download failed or is not Ogg');
