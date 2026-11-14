@@ -6,6 +6,7 @@ import { sleep } from '../logger.js';
 export class CloudflareQuotaExceeded extends Error {}
 
 const RETRY_ERRNOS = new Set(['ENOTFOUND', 'ECONNREFUSED', 'EAI_AGAIN']);
+const OPENROUTER_IMAGE_BASE = 'https://openrouter.ai/api/v1';
 
 function isRetryableFetchError(e: unknown): boolean {
   if (!(e instanceof Error)) return false;
@@ -35,6 +36,10 @@ export class ImageProvider {
       const base = this.c.image_url || 'https://api.cloudflare.com/client/v4';
       url = `${base.replace(/\/+$/, '')}/accounts/${account}/ai/run/${model}`;
       body = { prompt };
+    } else if (provider === 'openrouter') {
+      const base = this.c.image_url || OPENROUTER_IMAGE_BASE;
+      url = `${base.replace(/\/+$/, '')}/images`;
+      body = { model, prompt };
     } else if (provider === 'openai') {
       url = `${this.c.image_url.replace(/\/+$/, '')}/images/generations`;
       body = { model, prompt };

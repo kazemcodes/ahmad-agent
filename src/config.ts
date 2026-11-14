@@ -62,7 +62,11 @@ export const config: Config = (() => {
   const providerRaw = env('IMAGE_PROVIDER') || 'openai';
   const imageUrl = trimSlash(
     env('IMAGE_BASE_URL') ||
-      (providerRaw === 'cloudflare' ? '' : aiBase || ''),
+      (providerRaw === 'cloudflare'
+        ? ''
+        : providerRaw === 'openrouter'
+          ? 'https://openrouter.ai/api/v1'
+          : aiBase || ''),
   );
   const imageKey =
     env('IMAGE_API_KEY') ||
