@@ -1,7 +1,8 @@
 import type { ChatContext, Deps, UseCase } from '../context.js';
 import { substr } from '../util.js';
 
-const IMAGE_VERB = /(بساز|بکش|تولید کن|درست کن|ایجاد کن|بفرست|میخوام|می‌خوام|میخواهم)/u;
+const IMAGE_NOUN = /(عکس|تصویر|نقاشی|پوستر|اینفوگرافیک)/u;
+const IMAGE_VERB = /(بساز|بکش|تولید کن|درست کن|ایجاد کن|طراحی کن|خلاصه کن|تبدیل کن|درآر|در بیار|بفرست|میخوام|می‌خوام|میخواهم)/u;
 
 export const imageRequest: UseCase = async (ctx: ChatContext, deps: Deps) => {
   const { chat, user, mid, text } = ctx;
@@ -22,7 +23,7 @@ export const imageRequest: UseCase = async (ctx: ChatContext, deps: Deps) => {
     await deps.send(chat, '🎬 ساخت ویدیو هنوز فعال نیست؛ فقط تصویر پشتیبانی می‌شود.', mid);
     return true;
   } else if (
-    /(عکس|تصویر|نقاشی)/u.test(text) &&
+    IMAGE_NOUN.test(text) &&
     IMAGE_VERB.test(text) &&
     ((ctx.msg.chat?.type ?? '') === 'private' ||
       text.includes('آقای ناظر') ||
@@ -33,6 +34,13 @@ export const imageRequest: UseCase = async (ctx: ChatContext, deps: Deps) => {
   }
 
   if (imagePrompt === null) return false;
+
+  const repliedText = (ctx.msg.reply_to_message?.text ?? ctx.msg.reply_to_message?.caption ?? '').trim();
+  if (repliedText !== '') {
+    imagePrompt =
+      `درخواست کاربر:\n${imagePrompt}\n\n` +
+      `متن پیام ریپلای‌شده (فقط در صورتی از آن استفاده کن که کاربر به آن اشاره کرده باشد):\n${substr(repliedText, 2000)}`;
+  }
 
   if (!deps.queue.allow('image', user, deps.config.image_limit, 3600)) {
     await deps.send(chat, 'درخواست تصویر زیاد شده؛ لطفاً کمی بعد دوباره تلاش کن.', mid);

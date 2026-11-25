@@ -10,10 +10,14 @@ type Intent = (typeof INTENTS)[number];
 
 const SYSTEM =
   'You classify a Persian classroom bot message into exactly one intent. ' +
-  'Reply with ONLY the intent word, nothing else. ' +
-  'Intents: report (attendance list), today (today schedule), schedules (weekly schedule), ' +
-  'web (web search), image (generate image), help (how to use bot), chat (anything else). ' +
-  'If the message is a question about the bot, reply help.';
+  'Reply with ONLY the intent word, nothing else. Default to chat whenever unsure. ' +
+  'Intents: ' +
+  'report (ONLY if explicitly asking for today\'s attendance report/list of who attended; NEVER for general questions mentioning "حاضر", "در حال حاضر", "حضوری", or how to check in), ' +
+  'today (ONLY if explicitly asking for today\'s class schedule), ' +
+  'schedules (ONLY if explicitly asking for the weekly class schedule), ' +
+  'web (explicit web search request), image (explicit image generation request), ' +
+  'help (explicitly asking how to use the bot), ' +
+  'chat (any normal question, conversation, or anything else).';
 
 export async function classifyIntent(
   message: string,

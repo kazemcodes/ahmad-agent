@@ -39,7 +39,13 @@ export interface BaleMessage {
   document?: BaleDocument;
   sticker?: unknown;
   voice?: { file_id?: string; file_size?: number; [k: string]: unknown };
-  reply_to_message?: { from?: BaleUser; [k: string]: unknown };
+  reply_to_message?: {
+    message_id?: number;
+    from?: BaleUser;
+    text?: string;
+    caption?: string;
+    [k: string]: unknown;
+  };
   [k: string]: unknown;
 }
 

@@ -203,6 +203,70 @@ test('imageRequest /video stub', async () => {
   db.close();
 });
 
+test('imageRequest summarizes replied-to text into image prompt', async () => {
+  const { db, sent, deps } = setup();
+  deps.config.image_provider = 'openrouter';
+  deps.config.image_key = 'test-key';
+  deps.config.image_model = 'test-model';
+  let enqueuedPrompt = '';
+  deps.imageQueue.enqueue = (_u: any, _chat: number, _user: number, _mid: any, prompt: string) => {
+    enqueuedPrompt = prompt;
+    return { id: 1, deduplicated: false, position: 1 };
+  };
+  const c = ctx({
+    text: 'آقای ناظر این متنی که منشن کردم رو در قالب یک عکس خلاصه کن',
+    addressed: true,
+    msg: {
+      chat: { id: 100, type: 'group' },
+      reply_to_message: { text: 'فصل اول فیزیک: حرکت یکنواخت و شتاب ثابت' },
+    },
+    instructions: new ClassInstructions(db),
+  });
+  assert.equal(await imageRequest(c, deps), true);
+  assert.match(sent[0]!.text, /در حال ساخت تصویر/);
+  assert.match(enqueuedPrompt, /فصل اول فیزیک/);
+  assert.match(enqueuedPrompt, /خلاصه کن/);
+  db.close();
+});
+
+test('chatCmd includes replied-to message text in AI prompt', async () => {
+  const { db, sent, deps } = setup();
+  deps.config.ai_url = 'https://example.invalid';
+  deps.config.ai_key = 'k';
+  deps.config.ai_model = 'm';
+  let capturedMessages: Array<{ role: string; content: string }> = [];
+  deps.http = {
+    http: async (_url: string, body: any) => {
+      capturedMessages = body.messages;
+      return { choices: [{ message: { content: 'خلاصه شد!' } }] };
+    },
+  } as any;
+  const c = ctx({
+    text: 'آقای ناظر این متن رو خلاصه کن',
+    addressed: true,
+    msg: {
+      chat: { id: 100, type: 'group' },
+      reply_to_message: {
+        from: { id: 7, first_name: 'معلم' },
+        text: 'امتحان ریاضی روز یکشنبه ساعت ۱۰ برگزار می‌شود.',
+      },
+    },
+    instructions: new ClassInstructions(db),
+  });
+  assert.equal(await chatCmd(c, deps), true);
+  assert.equal(sent[0]!.text, 'خلاصه شد!');
+  assert.ok(capturedMessages.some((m) => m.role === 'system' && m.content.includes('امتحان ریاضی روز یکشنبه')));
+  db.close();
+});
+
+test('replyCheckIn still accepts "علی زارعی حاضر" in group', async () => {
+  const { db, sent, deps } = setup();
+  const c = ctx({ text: 'علی زارعی حاضر', isBotReply: false, instructions: new ClassInstructions(db) });
+  assert.equal(await replyCheckIn(c, deps), true);
+  assert.match(sent[0]!.text, /علی زارعی/);
+  db.close();
+});
+
 test('chatCmd stays silent when not called', async () => {
   const { db, sent, deps } = setup();
   const c = ctx({ text: 'سلام', instructions: new ClassInstructions(db) });
